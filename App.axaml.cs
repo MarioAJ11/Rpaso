@@ -24,8 +24,7 @@ public partial class App : Application
 
             var almacenamiento = new ServicioAlmacenamiento();
             var importacion = new ServicioImportacion(
-                new ServicioExtraccionPdf(),
-                new ServicioEstructuracionIa(),
+                new ServicioParserExamen(),
                 almacenamiento);
 
             var viewModel = new MainViewModel(

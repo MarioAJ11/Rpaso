@@ -1,10 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <!-- net10.0: la build netstandard2.0 de LLamaSharp 0.30.0 no incluye
-         NativeLibraryConfig.WithSearchDirectory, que hace falta para localizar
-         los binarios nativos de llama.cpp cuando el directorio de trabajo
-         no es la carpeta del ejecutable. -->
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -13,21 +9,8 @@
 
   <ItemGroup>
     <Folder Include="Models\" />
-    <!-- Los modelos GGUF NO son recursos de interfaz: se copian junto al ejecutable. -->
-    <AvaloniaResource Include="Assets\**" Exclude="Assets\Modelos\**" />
+    <AvaloniaResource Include="Assets\**" />
   </ItemGroup>
-
-  <!--
-    Los modelos GGUF pesan cientos de MB: copiarlos en cada compilación ralentiza el ciclo
-    de desarrollo y bloquea el fichero mientras se descarga. En desarrollo la aplicación los
-    localiza por rutas de búsqueda; al publicar se copian junto al ejecutable.
-  -->
-  <Target Name="CopiarModelosAlPublicar" AfterTargets="Publish">
-    <ItemGroup>
-      <ModelosAGG Include="Assets\Modelos\**\*.gguf" />
-    </ItemGroup>
-    <Copy SourceFiles="@(ModelosAGG)" DestinationFolder="$(PublishDir)Modelos\" SkipUnchangedFiles="true" />
-  </Target>
 
   <ItemGroup>
     <PackageReference Include="Avalonia" Version="12.1.4" />
@@ -39,8 +22,6 @@
       <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
     </PackageReference>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
-    <PackageReference Include="LLamaSharp" Version="0.30.0" />
-    <PackageReference Include="LLamaSharp.Backend.Cpu" Version="0.30.0" />
     <PackageReference Include="PdfPig" Version="0.1.16" />
   </ItemGroup>
 </Project>

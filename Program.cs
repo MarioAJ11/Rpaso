@@ -11,7 +11,7 @@ sealed class Program
     public static int Main(string[] args)
     {
         // Modos de verificación por consola: prueban el pipeline sin abrir la interfaz.
-        if (args.Length > 0 && args[0] is "--verificar" or "--texto")
+        if (args.Length > 0 && args[0] is "--verificar" or "--texto" or "--geometria" or "--analizar")
             return ModoVerificacion.Ejecutar(args[0], args[1..]);
 
         BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);

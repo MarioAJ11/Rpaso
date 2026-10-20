@@ -8,7 +8,7 @@ namespace Rpaso.Services;
 public interface IServicioImportacion
 {
     /// <summary>
-    /// Extrae el texto del PDF, lo estructura con el modelo local y guarda el test resultante.
+    /// Analiza el PDF, extrae sus preguntas y guarda el test resultante.
     /// </summary>
     /// <param name="rutaPdf">Ruta completa del archivo PDF.</param>
     /// <param name="carpetaId">Carpeta destino. Si es vacía, el test queda sin carpeta.</param>
@@ -18,32 +18,18 @@ public interface IServicioImportacion
 /// <inheritdoc cref="IServicioImportacion"/>
 public sealed class ServicioImportacion : IServicioImportacion
 {
-    private readonly IServicioExtraccionPdf _extraccion;
-    private readonly IServicioEstructuracionIa _estructuracion;
+    private readonly IServicioParserExamen _parser;
     private readonly IServicioAlmacenamiento _almacenamiento;
 
-    public ServicioImportacion(
-        IServicioExtraccionPdf extraccion,
-        IServicioEstructuracionIa estructuracion,
-        IServicioAlmacenamiento almacenamiento)
+    public ServicioImportacion(IServicioParserExamen parser, IServicioAlmacenamiento almacenamiento)
     {
-        _extraccion = extraccion;
-        _estructuracion = estructuracion;
+        _parser = parser;
         _almacenamiento = almacenamiento;
     }
 
     public async Task<Test> ImportarAsync(string rutaPdf, string carpetaId, CancellationToken ct = default)
     {
-        var paginas = await _extraccion.ExtraerPaginasAsync(rutaPdf, ct);
-        var preguntas = await _estructuracion.EstructurarAsync(paginas, ct);
-
-        var test = new Test(
-            Id: $"t-{Guid.NewGuid():N}"[..12],
-            Titulo: Path.GetFileNameWithoutExtension(rutaPdf),
-            CarpetaId: carpetaId,
-            FechaImportacion: DateTimeOffset.Now,
-            ArchivoOrigen: Path.GetFileName(rutaPdf),
-            Preguntas: preguntas);
+        var test = await _parser.AnalizarAsync(rutaPdf, carpetaId, ct);
 
         await _almacenamiento.GuardarTestAsync(test, ct);
 
