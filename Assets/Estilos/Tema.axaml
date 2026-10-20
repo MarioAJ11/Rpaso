@@ -1,0 +1,29 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- ================= PALETA ================= -->
+    <SolidColorBrush x:Key="BrushPrimario" Color="#5C54E5" />
+    <SolidColorBrush x:Key="BrushPrimarioOscuro" Color="#5048D4" />
+    <SolidColorBrush x:Key="BrushPrimarioSuave" Color="#F5F3FF" />
+    <SolidColorBrush x:Key="BrushPrimarioBorde" Color="#DDD9FA" />
+
+    <SolidColorBrush x:Key="BrushFondo" Color="#F8FAFC" />
+    <SolidColorBrush x:Key="BrushSuperficie" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="BrushBorde" Color="#E2E8F0" />
+    <SolidColorBrush x:Key="BrushBordeSuave" Color="#F1F5F9" />
+    <SolidColorBrush x:Key="BrushFondoTenue" Color="#F8FAFC" />
+
+    <SolidColorBrush x:Key="BrushTexto" Color="#0F172A" />
+    <SolidColorBrush x:Key="BrushTextoSecundario" Color="#64748B" />
+    <SolidColorBrush x:Key="BrushTextoTerciario" Color="#94A3B8" />
+
+    <SolidColorBrush x:Key="BrushExito" Color="#059669" />
+    <SolidColorBrush x:Key="BrushExitoSuave" Color="#ECFDF5" />
+    <SolidColorBrush x:Key="BrushExitoBorde" Color="#A7F3D0" />
+    <SolidColorBrush x:Key="BrushError" Color="#E11D48" />
+    <SolidColorBrush x:Key="BrushErrorSuave" Color="#FFF1F2" />
+    <SolidColorBrush x:Key="BrushErrorBorde" Color="#FECDD3" />
+    <SolidColorBrush x:Key="BrushAviso" Color="#D97706" />
+    <SolidColorBrush x:Key="BrushAvisoSuave" Color="#FFFBEB" />
+
+</ResourceDictionary>

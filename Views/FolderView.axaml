@@ -1,0 +1,136 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Rpaso.ViewModels"
+             xmlns:conv="using:Avalonia.Data.Converters"
+             x:Class="Rpaso.Views.FolderView"
+             x:DataType="vm:FolderViewModel">
+
+    <ScrollViewer>
+        <StackPanel Margin="34,28,34,34" Spacing="22" MaxWidth="1120" HorizontalAlignment="Center">
+
+            <!-- ==================== CABECERA ==================== -->
+            <Border Classes="panel" Padding="22">
+                <Grid ColumnDefinitions="*,Auto">
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="14">
+                        <Button Classes="fantasma" Command="{Binding VolverCommand}" Padding="8" VerticalAlignment="Top">
+                            <PathIcon Data="M 13,3 L 6,10 L 13,17 Z" Width="18" Height="18" />
+                        </Button>
+                        <StackPanel Spacing="6" VerticalAlignment="Center">
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <TextBlock Text="{Binding Nombre}" Classes="subtitulo" />
+                                <Border Background="{StaticResource BrushPrimarioSuave}" CornerRadius="8" Padding="8,2"
+                                        VerticalAlignment="Center">
+                                    <TextBlock Text="CARPETA" FontSize="10" FontWeight="Bold"
+                                               Foreground="{StaticResource BrushPrimario}" />
+                                </Border>
+                            </StackPanel>
+                            <TextBlock Text="{Binding Descripcion}" Classes="tenue" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                        <Button Classes="peligro"
+                                Command="{Binding PracticarCarpetaFalladasCommand}"
+                                CommandParameter="{Binding Carpeta}"
+                                IsEnabled="{Binding HayFalladas}">
+                            <StackPanel Orientation="Horizontal" Spacing="7">
+                                <PathIcon Data="M 16,5 A 7,7 0 1 1 11,3 L 11,0 L 18,4 L 11,8 L 11,5 A 4,4 0 1 0 14,9 Z"
+                                          Foreground="{StaticResource BrushError}" Width="15" Height="15" />
+                                <TextBlock VerticalAlignment="Center"
+                                           Text="{Binding TotalFalladas, StringFormat='Practicar solo falladas ({0})'}" />
+                            </StackPanel>
+                        </Button>
+
+                        <Button Classes="primario"
+                                Command="{Binding PracticarCarpetaCommand}"
+                                CommandParameter="{Binding Carpeta}"
+                                IsEnabled="{Binding HayTests}">
+                            <StackPanel Orientation="Horizontal" Spacing="7">
+                                <PathIcon Data="M 10,2 L 18,10 L 10,18 L 2,10 Z" Foreground="White" Width="15" Height="15" />
+                                <TextBlock VerticalAlignment="Center"
+                                           Text="{Binding TotalPreguntas, StringFormat='Practicar todos juntos ({0})'}" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- ==================== LISTA DE TESTS ==================== -->
+            <StackPanel Spacing="14">
+                <Grid ColumnDefinitions="*,Auto">
+                    <StackPanel Grid.Column="0" Spacing="3">
+                        <TextBlock Text="PDFs y exámenes en esta carpeta" FontSize="17" FontWeight="Bold" />
+                        <TextBlock Classes="micro"
+                                   Text="Puedes resolver cada test de forma individual o revisar solo las que has fallado" />
+                    </StackPanel>
+                    <Button Grid.Column="1" Classes="fantasma" Command="{Binding ImportarPdfCommand}" VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <PathIcon Data="M 9,2 L 11,2 L 11,9 L 18,9 L 18,11 L 11,11 L 11,18 L 9,18 L 9,11 L 2,11 L 2,9 L 9,9 Z"
+                                      Foreground="{StaticResource BrushPrimario}" Width="14" Height="14" />
+                            <TextBlock Text="Añadir otro PDF a esta carpeta" VerticalAlignment="Center"
+                                       Foreground="{StaticResource BrushPrimario}" FontWeight="SemiBold" FontSize="12" />
+                        </StackPanel>
+                    </Button>
+                </Grid>
+
+                <!-- Estado vacío -->
+                <Border Classes="panel" Padding="40" IsVisible="{Binding !HayTests}">
+                    <StackPanel Spacing="7" HorizontalAlignment="Center">
+                        <PathIcon Data="M 4,2 L 11,2 L 15,6 L 15,18 L 4,18 Z"
+                                  Width="36" Height="36" Foreground="{StaticResource BrushTextoTerciario}" />
+                        <TextBlock Text="Esta carpeta no tiene exámenes aún" FontWeight="Bold" HorizontalAlignment="Center" />
+                        <TextBlock Classes="micro" MaxWidth="380" TextWrapping="Wrap" HorizontalAlignment="Center"
+                                   Text="Importa un PDF de tipo test para empezar a estudiar las preguntas de esta materia." />
+                    </StackPanel>
+                </Border>
+
+                <ItemsControl ItemsSource="{Binding Tests}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:TestViewModel">
+                            <Border Classes="panel" Width="520" Margin="0,0,18,18" Padding="18">
+                                <StackPanel Spacing="12">
+                                    <Border Width="34" Height="34" CornerRadius="9"
+                                            Background="{StaticResource BrushErrorSuave}" HorizontalAlignment="Left">
+                                        <PathIcon Data="M 4,2 L 11,2 L 15,6 L 15,18 L 4,18 Z"
+                                                  Foreground="{StaticResource BrushError}" Width="17" Height="17" />
+                                    </Border>
+
+                                    <TextBlock Text="{Binding Titulo}" FontWeight="Bold" FontSize="15"
+                                               TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Titulo}" />
+
+                                    <StackPanel Orientation="Horizontal" Spacing="12">
+                                        <TextBlock Classes="micro"
+                                                   Text="{Binding TotalPreguntas, StringFormat='{}{0} preguntas'}" />
+                                        <TextBlock Classes="micro" Text="{Binding Fecha}" />
+                                        <TextBlock Classes="micro" Foreground="{StaticResource BrushError}"
+                                                   IsVisible="{Binding HayFalladas}"
+                                                   Text="{Binding TotalFalladas, StringFormat='{}{0} falladas'}" />
+                                    </StackPanel>
+
+                                    <Border Height="1" Background="{StaticResource BrushBordeSuave}" />
+
+                                    <Grid ColumnDefinitions="*,*">
+                                        <Button Grid.Column="0" Margin="0,0,8,0"
+                                                Command="{Binding $parent[ItemsControl].((vm:FolderViewModel)DataContext).PracticarTestFalladasCommand}"
+                                                CommandParameter="{Binding}"
+                                                Content="Revisar" />
+                                        <Button Grid.Column="1" Classes="primario"
+                                                Command="{Binding $parent[ItemsControl].((vm:FolderViewModel)DataContext).PracticarTestCommand}"
+                                                CommandParameter="{Binding}"
+                                                Content="Practicar" />
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

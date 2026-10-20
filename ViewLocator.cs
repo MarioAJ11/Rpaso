@@ -1,5 +1,4 @@
 using System;
-using System.Diagnostics.CodeAnalysis;
 using Avalonia.Controls;
 using Avalonia.Controls.Templates;
 using Rpaso.ViewModels;
@@ -7,31 +6,41 @@ using Rpaso.ViewModels;
 namespace Rpaso;
 
 /// <summary>
-/// Given a view model, returns the corresponding view if possible.
+/// Dado un ViewModel, devuelve la vista que le corresponde.
 /// </summary>
-[RequiresUnreferencedCode(
-    "Default implementation of ViewLocator involves reflection which may be trimmed away.",
-    Url = "https://docs.avaloniaui.net/docs/concepts/view-locator")]
+/// <remarks>
+/// Convención: <c>Rpaso.ViewModels.XxxViewModel</c> -&gt; <c>Rpaso.Views.XxxView</c>.
+/// El nombre de la vista se obtiene sustituyendo "ViewModel" por "View", por eso las
+/// clases de vista deben llamarse exactamente XxxView (y no XxxWindow).
+/// </remarks>
 public class ViewLocator : IDataTemplate
 {
     public Control? Build(object? param)
     {
         if (param is null)
             return null;
-        
-        var name = param.GetType().FullName!.Replace("ViewModel", "View", StringComparison.Ordinal);
-        var type = Type.GetType(name);
 
-        if (type != null)
-        {
-            return (Control)Activator.CreateInstance(type)!;
-        }
-        
-        return new TextBlock { Text = "Not Found: " + name };
+        var tipo = Resolver(param.GetType());
+
+        if (tipo is null)
+            return new TextBlock { Text = $"Sin vista para {param.GetType().Name}" };
+
+        return (Control)Activator.CreateInstance(tipo)!;
     }
 
     public bool Match(object? data)
     {
-        return data is ViewModelBase;
+        if (data is not ViewModelBase)
+            return false;
+
+        // Solo hace match si la vista existe de verdad. Si no, la plantilla no secuestra
+        // el elemento y Avalonia usa su representación por defecto.
+        return Resolver(data.GetType()) is not null;
+    }
+
+    private static Type? Resolver(Type tipoViewModel)
+    {
+        var nombre = tipoViewModel.FullName!.Replace("ViewModel", "View", StringComparison.Ordinal);
+        return Type.GetType(nombre);
     }
 }

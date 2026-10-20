@@ -3,7 +3,16 @@
              x:Class="Rpaso.App"
              xmlns:local="using:Rpaso"
              RequestedThemeVariant="Default">
-             <!-- "Default" ThemeVariant follows system theme variant. "Dark" or "Light" are other available options. -->
+    <!-- "Default" ThemeVariant follows system theme variant. "Dark" or "Light" are other available options. -->
+
+    <!-- Paleta de colores: recursos compartidos por toda la aplicación -->
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceInclude Source="avares://Rpaso/Assets/Estilos/Tema.axaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Application.Resources>
 
     <Application.DataTemplates>
         <local:ViewLocator />
@@ -11,5 +20,6 @@
 
     <Application.Styles>
         <FluentTheme />
+        <StyleInclude Source="avares://Rpaso/Assets/Estilos/Estilos.axaml" />
     </Application.Styles>
 </Application>

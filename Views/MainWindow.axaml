@@ -1,28 +1,187 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:Rpaso.ViewModels"
-        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+        xmlns:conv="using:Avalonia.Data.Converters"
         x:Class="Rpaso.Views.MainWindow"
         x:DataType="vm:MainViewModel"
-        Icon="/Assets/avalonia-logo.ico"
-        Title="Rpaso">
+        Title="Repaso"
+        Width="1320" Height="840"
+        MinWidth="1060" MinHeight="680"
+        Background="{StaticResource BrushFondo}"
+        WindowStartupLocation="CenterScreen">
 
-    <Design.DataContext>
-        <!-- This only sets the DataContext for the previewer in an IDE,
-             to set the actual DataContext for runtime, set the DataContext property in code (look at App.axaml.cs) -->
-        <vm:MainViewModel />
-    </Design.DataContext>
+    <Grid ColumnDefinitions="264,*">
 
-    <StackPanel Spacing="16"
-                HorizontalAlignment="Center"
-                VerticalAlignment="Center">
+        <!-- ==================== BARRA LATERAL ==================== -->
+        <Border Grid.Column="0"
+                Background="{StaticResource BrushSuperficie}"
+                BorderBrush="{StaticResource BrushBorde}"
+                BorderThickness="0,0,1,0">
+            <Grid RowDefinitions="Auto,Auto,Auto,*,Auto">
 
-        <TextBox Text="{Binding Greeting}" />
+                <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="24,22,24,0" Spacing="10">
+                    <Border Width="36" Height="36" CornerRadius="10" Background="{StaticResource BrushPrimario}">
+                        <PathIcon Data="M 3,3 L 8,3 L 10,5 L 10,17 L 3,17 Z M 12,3 L 17,3 L 17,17 L 12,17 Z"
+                                  Foreground="White" Width="20" Height="20" />
+                    </Border>
+                    <StackPanel Orientation="Horizontal" Spacing="1">
+                        <TextBlock Text="repaso" Classes="marca" />
+                        <TextBlock Text="." Classes="marcaParte" />
+                    </StackPanel>
+                </StackPanel>
 
-        <TextBlock Text="{Binding Greeting}" />
+                <TextBlock Grid.Row="1" Text="MENÚ" Classes="etiqueta" Margin="24,28,24,0" />
 
-    </StackPanel>
+                <StackPanel Grid.Row="2" Margin="12,10,12,0" Spacing="4">
+                    <Button Classes="nav"
+                            Classes.activo="{Binding EsVistaInicio}"
+                            Command="{Binding IrAInicioCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <PathIcon Data="M 2,9 L 10,2 L 18,9 L 16,9 L 16,17 L 11.5,17 L 11.5,12 L 8.5,12 L 8.5,17 L 4,17 L 4,9 Z" />
+                            <TextBlock Text="Inicio" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
 
+                    <Button Classes="nav" Command="{Binding IrAInicioCommand}">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="12">
+                                <PathIcon Data="M 2,5 L 8,5 L 10,7 L 18,7 L 18,16 L 2,16 Z" />
+                                <TextBlock Text="Mis carpetas" VerticalAlignment="Center" />
+                            </StackPanel>
+                            <Border Grid.Column="1" Background="{StaticResource BrushFondoTenue}" CornerRadius="8" Padding="7,1">
+                                <TextBlock Text="{Binding Carpetas.Count}" FontSize="11" FontWeight="SemiBold"
+                                           Foreground="{StaticResource BrushTextoSecundario}" />
+                            </Border>
+                        </Grid>
+                    </Button>
+                </StackPanel>
+
+                <Border Grid.Row="4"
+                        Background="{StaticResource BrushFondoTenue}"
+                        BorderBrush="{StaticResource BrushBorde}"
+                        BorderThickness="1"
+                        CornerRadius="14"
+                        Margin="14"
+                        Padding="14">
+                    <StackPanel Spacing="5">
+                        <TextBlock Text="Repaso local" FontSize="12" FontWeight="SemiBold" />
+                        <TextBlock Classes="micro"
+                                   Text="Tus PDFs y tus preguntas se procesan en este equipo. Nada sale de tu ordenador."
+                                   TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Border>
+
+        <!-- ==================== CONTENIDO ==================== -->
+        <Grid Grid.Column="1" RowDefinitions="64,*">
+
+            <!-- Barra superior -->
+            <Border Grid.Row="0"
+                    Background="{StaticResource BrushSuperficie}"
+                    BorderBrush="{StaticResource BrushBorde}"
+                    BorderThickness="0,0,0,1">
+                <Grid ColumnDefinitions="*,Auto" Margin="28,0">
+                    <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                        <TextBlock Text="Mi espacio" Classes="tenue" />
+                        <TextBlock Text="/" Classes="tenue" />
+                        <Button Classes="fantasma" Content="Inicio" Command="{Binding IrAInicioCommand}" />
+                        <Button Classes="fantasma"
+                                Content="{Binding MigaCarpeta}"
+                                IsVisible="{Binding MigaCarpeta, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
+                        <Button Classes="fantasma"
+                                Content="{Binding MigaExamen}"
+                                IsVisible="{Binding MigaExamen, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="18" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Estado}"
+                                   Classes="micro"
+                                   VerticalAlignment="Center"
+                                   MaxWidth="380"
+                                   TextTrimming="CharacterEllipsis" />
+                        <StackPanel Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
+                            <Ellipse Width="8" Height="8" Fill="{StaticResource BrushExito}" />
+                            <TextBlock Text="Solo en este dispositivo" Classes="micro" />
+                        </StackPanel>
+                        <Border Width="32" Height="32" CornerRadius="16"
+                                Background="{StaticResource BrushPrimarioSuave}"
+                                BorderBrush="{StaticResource BrushPrimarioBorde}" BorderThickness="1">
+                            <TextBlock Text="R" FontSize="12" FontWeight="Bold"
+                                       Foreground="{StaticResource BrushPrimario}"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- Vista activa: el ViewLocator convierte el ViewModel en su control -->
+            <ContentControl Grid.Row="1" Content="{Binding VistaActual}" />
+
+            <!-- Capa de carga -->
+            <Border Grid.Row="1" Background="#77FFFFFF" IsVisible="{Binding Ocupado}">
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="14">
+                    <ProgressBar IsIndeterminate="True" Width="240" />
+                    <TextBlock Text="Procesando con el modelo local…" Classes="tenue" HorizontalAlignment="Center" />
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <!-- ==================== MODAL: NUEVA CARPETA ==================== -->
+        <Border Grid.ColumnSpan="2" Background="#66000000" IsVisible="{Binding ModalVisible}">
+            <Border Background="{StaticResource BrushSuperficie}"
+                    BorderBrush="{StaticResource BrushBorde}" BorderThickness="1"
+                    CornerRadius="20"
+                    Width="440"
+                    Padding="26"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center">
+                <StackPanel Spacing="18">
+                    <TextBlock Text="Crear nueva carpeta" Classes="subtitulo" />
+
+                    <StackPanel Spacing="7">
+                        <TextBlock Text="NOMBRE DE LA CARPETA" Classes="etiqueta" />
+                        <TextBox Text="{Binding NuevaCarpetaNombre}" Watermark="Ej: Bases de Datos y SQL" />
+                    </StackPanel>
+
+                    <StackPanel Spacing="7">
+                        <TextBlock Text="DESCRIPCIÓN (OPCIONAL)" Classes="etiqueta" />
+                        <TextBox Text="{Binding NuevaCarpetaDescripcion}" Watermark="Ej: Temas 1 al 4" />
+                    </StackPanel>
+
+                    <StackPanel Spacing="9">
+                        <TextBlock Text="COLOR IDENTIFICATIVO" Classes="etiqueta" />
+                        <ItemsControl ItemsSource="{Binding Colores}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:ColorCarpetaViewModel">
+                                    <Button Width="56" Height="42" Margin="0,0,8,8"
+                                            Background="{Binding Fondo}"
+                                            BorderBrush="{Binding Borde}"
+                                            BorderThickness="2"
+                                            CornerRadius="12"
+                                            Classes.seleccionado="{Binding Seleccionado}"
+                                            Command="{Binding $parent[ItemsControl].((vm:MainViewModel)DataContext).SeleccionarColorCommand}"
+                                            CommandParameter="{Binding Id}"
+                                            ToolTip.Tip="{Binding Nombre}">
+                                        <Ellipse Width="14" Height="14" Fill="{Binding Icono}" />
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10" Margin="0,6,0,0">
+                        <Button Content="Cancelar" Command="{Binding CerrarModalCarpetaCommand}" />
+                        <Button Content="Crear carpeta" Classes="primario" Command="{Binding CrearCarpetaCommand}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Border>
+
+    </Grid>
 </Window>

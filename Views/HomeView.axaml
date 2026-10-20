@@ -1,0 +1,188 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Rpaso.ViewModels"
+             xmlns:conv="using:Avalonia.Data.Converters"
+             x:Class="Rpaso.Views.HomeView"
+             x:DataType="vm:HomeViewModel">
+
+    <ScrollViewer>
+        <StackPanel Margin="34,28,34,34" Spacing="26" MaxWidth="1120" HorizontalAlignment="Center">
+
+            <!-- ==================== CABECERA ==================== -->
+            <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Grid.Column="0" Spacing="7" VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" Spacing="7">
+                        <PathIcon Data="M 10,1 L 12.5,7.5 L 19,10 L 12.5,12.5 L 10,19 L 7.5,12.5 L 1,10 L 7.5,7.5 Z"
+                                  Foreground="{StaticResource BrushPrimario}" Width="14" Height="14" />
+                        <TextBlock Text="TU ESPACIO DE ESTUDIO" Classes="etiqueta"
+                                   Foreground="{StaticResource BrushPrimario}" />
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" Spacing="0">
+                        <TextBlock Classes="titulo" Text="Estudia a tu " />
+                        <TextBlock Classes="titulo" Text="manera" Foreground="{StaticResource BrushPrimario}" />
+                        <TextBlock Classes="titulo" Text="." Foreground="{StaticResource BrushPrimario}" />
+                    </StackPanel>
+
+                    <TextBlock Classes="tenue" MaxWidth="560" TextWrapping="Wrap"
+                               Text="Organiza tus PDFs por carpetas, practica los exámenes en bloque o repasa únicamente las preguntas que has fallado." />
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                    <Button Command="{Binding AbrirModalCarpetaCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <PathIcon Data="M 9,2 L 11,2 L 11,9 L 18,9 L 18,11 L 11,11 L 11,18 L 9,18 L 9,11 L 2,11 L 2,9 L 9,9 Z"
+                                      Foreground="{StaticResource BrushPrimario}" Width="16" Height="16" />
+                            <TextBlock Text="Nueva carpeta" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+
+                    <Button Classes="primario" Command="{Binding ImportarPdfCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <PathIcon Data="M 2,5 L 8,5 L 10,7 L 18,7 L 18,16 L 2,16 Z"
+                                      Foreground="White" Width="16" Height="16" />
+                            <TextBlock Text="Importar PDF" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </Grid>
+
+            <!-- ==================== MÉTRICAS ==================== -->
+            <Grid ColumnDefinitions="*,*,*">
+                <Border Grid.Column="0" Classes="panel" Padding="18" Margin="0,0,9,0">
+                    <Grid ColumnDefinitions="Auto,*">
+                        <Border Grid.Column="0" Width="46" Height="46" CornerRadius="12"
+                                Background="{StaticResource BrushPrimarioSuave}" Margin="0,0,14,0">
+                            <PathIcon Data="M 4,2 L 11,2 L 15,6 L 15,18 L 4,18 Z"
+                                      Foreground="{StaticResource BrushPrimario}" Width="22" Height="22" />
+                        </Border>
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <TextBlock Text="EXÁMENES GUARDADOS" Classes="etiqueta" />
+                            <TextBlock Text="{Binding TotalTests}" FontSize="24" FontWeight="Bold" />
+                            <TextBlock Classes="micro" Text="en tus carpetas" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <Border Grid.Column="1" Classes="panel" Padding="18" Margin="9,0">
+                    <Grid ColumnDefinitions="Auto,*">
+                        <Border Grid.Column="0" Width="46" Height="46" CornerRadius="12"
+                                Background="{StaticResource BrushExitoSuave}" Margin="0,0,14,0">
+                            <PathIcon Data="M 10,2 L 18,10 L 10,18 L 2,10 Z"
+                                      Foreground="{StaticResource BrushExito}" Width="22" Height="22" />
+                        </Border>
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <TextBlock Text="PREGUNTAS LISTAS" Classes="etiqueta" />
+                            <TextBlock Text="{Binding TotalPreguntas}" FontSize="24" FontWeight="Bold" />
+                            <TextBlock Classes="micro" Text="extraídas de tus PDFs" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <Border Grid.Column="2" Classes="panel" Padding="18" Margin="9,0,0,0">
+                    <Grid ColumnDefinitions="Auto,*">
+                        <Border Grid.Column="0" Width="46" Height="46" CornerRadius="12"
+                                Background="{StaticResource BrushErrorSuave}" Margin="0,0,14,0">
+                            <PathIcon Data="M 16,5 A 7,7 0 1 1 11,3 L 11,0 L 18,4 L 11,8 L 11,5 A 4,4 0 1 0 14,9 Z"
+                                      Foreground="{StaticResource BrushError}" Width="22" Height="22" />
+                        </Border>
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <TextBlock Text="POR REFORZAR" Classes="etiqueta" />
+                            <TextBlock Text="{Binding TotalFalladas}" FontSize="24" FontWeight="Bold"
+                                       Foreground="{StaticResource BrushError}" />
+                            <TextBlock Classes="micro" Text="preguntas falladas" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+            </Grid>
+
+            <!-- ==================== CARPETAS ==================== -->
+            <StackPanel Spacing="14">
+                <Grid ColumnDefinitions="*,Auto">
+                    <StackPanel Grid.Column="0" Spacing="3">
+                        <TextBlock Text="Tus carpetas de estudio" FontSize="17" FontWeight="Bold" />
+                        <TextBlock Classes="micro"
+                                   Text="Entra en una carpeta para practicar sus tests o resolver solo las que has fallado" />
+                    </StackPanel>
+                    <TextBlock Grid.Column="1" Classes="micro" VerticalAlignment="Center"
+                               Text="{Binding TextoCarpetas}" />
+                </Grid>
+
+                <ItemsControl ItemsSource="{Binding Carpetas}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:CarpetaViewModel">
+                            <Button Classes="tarjeta" Width="330" Margin="0,0,18,18"
+                                    Command="{Binding $parent[ItemsControl].((vm:HomeViewModel)DataContext).AbrirCarpetaCommand}"
+                                    CommandParameter="{Binding}">
+                                <StackPanel Spacing="14">
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <Border Grid.Column="0" Width="46" Height="46" CornerRadius="12" Background="{Binding Fondo}">
+                                            <PathIcon Data="M 2,5 L 8,5 L 10,7 L 18,7 L 18,16 L 2,16 Z"
+                                                      Foreground="{Binding Icono}" Width="24" Height="24" />
+                                        </Border>
+                                        <Border Grid.Column="1" Background="{StaticResource BrushFondoTenue}"
+                                                CornerRadius="8" Padding="8,3" VerticalAlignment="Top">
+                                            <TextBlock FontSize="11" FontWeight="SemiBold"
+                                                       Foreground="{StaticResource BrushTextoSecundario}"
+                                                       Text="{Binding NumeroPdfs, StringFormat='{}{0} PDF'}" />
+                                        </Border>
+                                    </Grid>
+
+                                    <TextBlock Text="{Binding Nombre}" FontSize="16" FontWeight="Bold"
+                                               TextTrimming="CharacterEllipsis" />
+
+                                    <TextBlock Text="{Binding Descripcion}" Classes="micro" TextWrapping="Wrap"
+                                               MaxHeight="34" />
+
+                                    <Border Height="1" Background="{StaticResource BrushBordeSuave}" />
+
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                                            <TextBlock Classes="micro"
+                                                       Text="{Binding TotalPreguntas, StringFormat='{}{0} preguntas'}" />
+                                            <TextBlock Classes="micro" Foreground="{StaticResource BrushError}"
+                                                       IsVisible="{Binding HayFalladas}"
+                                                       Text="{Binding TotalFalladas, StringFormat='{}{0} falladas'}" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                                            <TextBlock Text="Abrir" FontSize="12" FontWeight="SemiBold"
+                                                       Foreground="{StaticResource BrushPrimario}" VerticalAlignment="Center" />
+                                            <PathIcon Data="M 6,3 L 12,9 L 6,15 Z" Foreground="{StaticResource BrushPrimario}"
+                                                      Width="12" Height="12" />
+                                        </StackPanel>
+                                    </Grid>
+                                </StackPanel>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <!-- Tarjeta para crear carpeta -->
+                <Button Width="330" Margin="0,0,18,18"
+                        HorizontalAlignment="Left"
+                        Background="Transparent"
+                        BorderBrush="{StaticResource BrushBorde}"
+                        BorderThickness="2"
+                        CornerRadius="16"
+                        MinHeight="150"
+                        Command="{Binding AbrirModalCarpetaCommand}">
+                    <StackPanel Spacing="9" VerticalAlignment="Center">
+                        <Border Width="40" Height="40" CornerRadius="20"
+                                Background="{StaticResource BrushFondoTenue}" HorizontalAlignment="Center">
+                            <PathIcon Data="M 9,2 L 11,2 L 11,9 L 18,9 L 18,11 L 11,11 L 11,18 L 9,18 L 9,11 L 2,11 L 2,9 L 9,9 Z"
+                                      Width="18" Height="18" />
+                        </Border>
+                        <TextBlock Text="Crear nueva carpeta" FontSize="14" FontWeight="Bold" HorizontalAlignment="Center" />
+                        <TextBlock Classes="micro" Text="Organiza tus asignaturas o materias" HorizontalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

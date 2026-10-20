@@ -1,0 +1,143 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Rpaso.ViewModels"
+             xmlns:conv="using:Avalonia.Data.Converters"
+             x:Class="Rpaso.Views.QuizView"
+             x:DataType="vm:QuizViewModel">
+
+    <ScrollViewer>
+        <StackPanel Margin="34,28,34,34" Spacing="20" MaxWidth="840" HorizontalAlignment="Center">
+
+            <!-- ==================== PROGRESO ==================== -->
+            <Border Classes="panel" Padding="18">
+                <Grid ColumnDefinitions="*,Auto">
+                    <StackPanel Grid.Column="0" Spacing="5">
+                        <Button Classes="fantasma" Command="{Binding SalirCommand}" Padding="6,0" HorizontalAlignment="Left">
+                            <StackPanel Orientation="Horizontal" Spacing="5">
+                                <PathIcon Data="M 13,3 L 6,10 L 13,17 Z" Width="13" Height="13" />
+                                <TextBlock Text="Salir del examen" FontSize="12" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                        <TextBlock Text="{Binding Titulo}" FontWeight="Bold" FontSize="16" />
+                        <TextBlock Text="{Binding ResultadoTexto}" Classes="micro"
+                                   IsVisible="{Binding ResultadoTexto, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Right">
+                        <TextBlock Text="PREGUNTA" Classes="etiqueta" HorizontalAlignment="Right" />
+                        <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Right">
+                            <TextBlock Text="{Binding NumeroPregunta}" FontSize="18" FontWeight="Bold"
+                                       Foreground="{StaticResource BrushPrimario}" />
+                            <TextBlock Text="{Binding Preguntas.Count, StringFormat='{} / {0}'}" FontSize="18"
+                                       Foreground="{StaticResource BrushTextoTerciario}" />
+                        </StackPanel>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- ==================== PREGUNTA ==================== -->
+            <Border Classes="panel" Padding="26">
+                <StackPanel Spacing="20">
+
+                    <StackPanel Spacing="7">
+                        <TextBlock Text="{Binding NumeroPregunta, StringFormat='PREGUNTA #{0}'}" Classes="etiqueta"
+                                   Foreground="{StaticResource BrushPrimario}" />
+                        <TextBlock Text="{Binding PreguntaActual.Enunciado}" FontSize="19" FontWeight="Bold"
+                                   TextWrapping="Wrap" LineHeight="28" />
+                    </StackPanel>
+
+                    <ItemsControl ItemsSource="{Binding Opciones}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:OpcionViewModel">
+                                <Button Classes="opcion" Margin="0,0,0,9"
+                                        Classes.seleccionada="{Binding MostrarSeleccionada}"
+                                        Classes.acertada="{Binding MostrarAcierto}"
+                                        Classes.fallada="{Binding MostrarFallo}"
+                                        Command="{Binding $parent[ItemsControl].((vm:QuizViewModel)DataContext).SeleccionarCommand}"
+                                        CommandParameter="{Binding Id}">
+                                    <Grid ColumnDefinitions="Auto,*,Auto">
+                                        <Border Grid.Column="0" Width="30" Height="30" CornerRadius="9"
+                                                Background="{StaticResource BrushFondoTenue}" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Id}" FontWeight="Bold" FontSize="12"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        </Border>
+                                        <TextBlock Grid.Column="1" Text="{Binding Texto}" TextWrapping="Wrap"
+                                                   Margin="12,0" VerticalAlignment="Center" FontSize="14" />
+                                        <PathIcon Grid.Column="2" Data="M 4,10 L 8,14 L 16,6 L 15,5 L 8,12 L 5,9 Z"
+                                                  Foreground="{StaticResource BrushExito}" Width="19" Height="19"
+                                                  IsVisible="{Binding MostrarAcierto}" />
+                                        <PathIcon Grid.Column="2" Data="M 5,5 L 7,5 L 10,8 L 13,5 L 15,5 L 11,10 L 15,15 L 13,15 L 10,12 L 7,15 L 5,15 L 9,10 Z"
+                                                  Foreground="{StaticResource BrushError}" Width="19" Height="19"
+                                                  IsVisible="{Binding MostrarFallo}" />
+                                    </Grid>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <!-- Feedback: respuesta incorrecta -->
+                    <Border Background="{StaticResource BrushErrorSuave}" BorderBrush="{StaticResource BrushErrorBorde}"
+                            BorderThickness="1" CornerRadius="12" Padding="16"
+                            IsVisible="{Binding RespuestaEsIncorrecta}">
+                        <StackPanel Orientation="Horizontal" Spacing="11">
+                            <PathIcon Data="M 10,1 L 19,18 L 1,18 Z" Foreground="{StaticResource BrushError}"
+                                      Width="18" Height="18" VerticalAlignment="Top" />
+                            <StackPanel Spacing="3">
+                                <TextBlock Text="Respuesta incorrecta" FontWeight="Bold" FontSize="13"
+                                           Foreground="{StaticResource BrushError}" />
+                                <TextBlock Classes="micro" TextWrapping="Wrap" Foreground="{StaticResource BrushError}"
+                                           Text="{Binding PreguntaActual.ClaveRespuesta, StringFormat='La opción correcta era la ({0}). Esta pregunta queda marcada para repasarla.'}" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Feedback: respuesta correcta -->
+                    <Border Background="{StaticResource BrushExitoSuave}" BorderBrush="{StaticResource BrushExitoBorde}"
+                            BorderThickness="1" CornerRadius="12" Padding="16"
+                            IsVisible="{Binding RespuestaEsCorrecta}">
+                        <StackPanel Orientation="Horizontal" Spacing="11">
+                            <PathIcon Data="M 4,10 L 8,14 L 16,6 L 15,5 L 8,12 L 5,9 Z"
+                                      Foreground="{StaticResource BrushExito}" Width="18" Height="18" VerticalAlignment="Top" />
+                            <TextBlock Text="¡Correcto!" FontWeight="Bold" FontSize="13"
+                                       Foreground="{StaticResource BrushExito}" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Navegación -->
+                    <Border Height="1" Background="{StaticResource BrushBordeSuave}" />
+
+                    <Grid ColumnDefinitions="Auto,Auto,*">
+                        <Button Grid.Column="0" Command="{Binding AnteriorCommand}" IsEnabled="{Binding !EsPrimera}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <PathIcon Data="M 13,3 L 6,10 L 13,17 Z" Width="13" Height="13" />
+                                <TextBlock Text="Anterior" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+
+                        <Button Grid.Column="1" Margin="10,0,0,0" Command="{Binding ComprobarCommand}"
+                                IsEnabled="{Binding PuedeComprobar}" Classes="primario">
+                            Text="Comprobar"
+                        </Button>
+
+                        <Button Grid.Column="2" HorizontalAlignment="Right"
+                                Command="{Binding SiguienteCommand}" IsEnabled="{Binding !EsUltima}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <TextBlock Text="Siguiente" VerticalAlignment="Center" />
+                                <PathIcon Data="M 7,3 L 14,10 L 7,17 Z" Width="13" Height="13" />
+                            </StackPanel>
+                        </Button>
+                    </Grid>
+
+                </StackPanel>
+            </Border>
+
+            <!-- Finalizar -->
+            <Button Classes="primario" HorizontalAlignment="Center" Padding="22,12"
+                    Command="{Binding SalirCommand}"
+                    IsVisible="{Binding EsUltima}">
+                Finalizar y volver a la carpeta
+            </Button>
+
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>
