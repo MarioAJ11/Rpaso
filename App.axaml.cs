@@ -24,7 +24,7 @@ public partial class App : Application
 
             var almacenamiento = new ServicioAlmacenamiento();
             var importacion = new ServicioImportacion(
-                new ServicioParserExamen(),
+                new ServicioParserExamen(new ServicioOcrWindows()),
                 almacenamiento);
 
             var viewModel = new MainViewModel(
@@ -50,8 +50,22 @@ public partial class App : Application
     {
         var vista = Environment.GetEnvironmentVariable("RPASO_TEST_VISTA");
 
-        if (vista is not ("carpeta" or "quiz" or "quiz-corregido" or "informe"))
+        if (vista is not ("carpeta" or "quiz" or "quiz-corregido" or "informe" or "editor"))
             return;
+
+        // Modo editor: abre el editor del primer test de la primera carpeta.
+        if (vista == "editor")
+        {
+            await viewModel.CargarDatosAsync();
+
+            var carpetaEditor = viewModel.Carpetas.FirstOrDefault();
+            var test = carpetaEditor?.Tests.FirstOrDefault();
+
+            if (test is not null)
+                viewModel.AbrirEditorCommand.Execute(test);
+
+            return;
+        }
 
         // Modo informe: importa los PDFs de RPASO_TEST_PDFS (separados por ';') y muestra el informe.
         if (vista == "informe")

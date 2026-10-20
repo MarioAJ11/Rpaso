@@ -97,6 +97,17 @@ public sealed class ServicioParserExamen : IServicioParserExamen
         @"\.(pdf|docx?|txt|png|jpe?g|odt|zip|xlsx?|pptx?)$",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
+    private readonly IServicioOcr? _ocr;
+
+    /// <param name="ocr">
+    /// Servicio de OCR opcional. Si el PDF no tiene capa de texto, se usa para leerlo
+    /// por imagen (PDF escaneados).
+    /// </param>
+    public ServicioParserExamen(IServicioOcr? ocr = null)
+    {
+        _ocr = ocr;
+    }
+
     public async Task<AnalisisExamen> AnalizarAsync(string rutaPdf, string carpetaId, CancellationToken ct = default)
     {
         if (!File.Exists(rutaPdf))
@@ -130,6 +141,29 @@ public sealed class ServicioParserExamen : IServicioParserExamen
             }
         }, ct);
 
+        // Sin capa de texto: es un escaneo. Se intenta el OCR.
+        var usoOcr = false;
+
+        if (preguntas.Count == 0 && _ocr is { Disponible: true })
+        {
+            var paginasOcr = await _ocr.ReconocerAsync(rutaPdf, ct);
+
+            foreach (var pagina in paginasOcr)
+            {
+                ct.ThrowIfCancellationRequested();
+
+                var lineas = ReconstruirLineas(pagina.Palabras.ToList(), pagina.Ancho, pagina.Alto);
+
+                if (lineas.Count > 0)
+                    paginasConTexto++;
+
+                lineasTotales += lineas.Count;
+                InterpretarLineas(lineas, preguntas, numeros, claves);
+            }
+
+            usoOcr = paginasOcr.Count > 0;
+        }
+
         AplicarClaves(preguntas, numeros, claves);
 
         var test = new Test(
@@ -140,7 +174,12 @@ public sealed class ServicioParserExamen : IServicioParserExamen
             ArchivoOrigen: Path.GetFileName(rutaPdf),
             Preguntas: preguntas);
 
-        return new AnalisisExamen(test, CalcularAviso(paginasTotales, paginasConTexto, lineasTotales, preguntas.Count));
+        var aviso = CalcularAviso(paginasTotales, paginasConTexto, lineasTotales, preguntas.Count);
+
+        if (usoOcr && aviso is not null)
+            aviso = "El PDF es un escaneo y se ha leído con OCR: " + aviso;
+
+        return new AnalisisExamen(test, aviso);
     }
 
     /// <summary>
@@ -170,7 +209,7 @@ public sealed class ServicioParserExamen : IServicioParserExamen
 
     private sealed class Linea
     {
-        public required List<Word> Palabras { get; init; }
+        public required List<PalabraTexto> Palabras { get; init; }
         public required string Texto { get; set; }
         public required double Base { get; init; }
         public required double Izquierda { get; set; }
@@ -197,39 +236,73 @@ public sealed class ServicioParserExamen : IServicioParserExamen
         /// subconjunto ("DAAAAA+Times") es asignado por orden de aparición y no dice nada
         /// sobre si la fuente es negrita ("Times" puede ser Roman o Bold).
         /// </remarks>
-        public bool Negrita => Palabras.Any(p =>
-            p.Letters.Count > 0
-            && (p.Letters[0].FontDetails?.IsBold == true
-                || (p.Letters[0].FontName?.Contains("Bold", StringComparison.OrdinalIgnoreCase) ?? false)
-                || (p.Letters[0].FontName?.Contains("Heavy", StringComparison.OrdinalIgnoreCase) ?? false)
-                || (p.Letters[0].FontName?.Contains("Black", StringComparison.OrdinalIgnoreCase) ?? false)));
+        public bool Negrita => Palabras.Any(p => p.Negrita);
+    }
+
+    /// <summary>
+    /// Extrae las palabras del PDF con su posición.
+    /// </summary>
+    private static List<PalabraTexto> ExtraerPalabras(Page pagina) =>
+        pagina.GetWords(new NearestNeighbourWordExtractor(
+            new NearestNeighbourWordExtractor.NearestNeighbourWordExtractorOptions
+            {
+                MaximumDistance = DistanciaMaximaPalabra
+            }))
+            .Where(p => p.TextOrientation == TextOrientation.Horizontal)
+            .Where(p => !string.IsNullOrWhiteSpace(p.Text))
+            .Select(p => new PalabraTexto(
+                p.Text,
+                p.BoundingBox.Left,
+                p.BoundingBox.Right,
+                p.BoundingBox.Top,
+                p.BoundingBox.Bottom,
+                EsNegrita(p)))
+            .OrderByDescending(p => p.Inferior)
+            .ToList();
+
+    /// <summary>
+    /// True si la palabra va en negrita. Se usa <c>FontDetails.IsBold</c> y no el nombre de
+    /// la fuente: el prefijo de subconjunto ("DAAAAA+Times") se asigna por orden de aparición
+    /// y no dice nada sobre si la fuente es negrita ("Times" puede ser Roman o Bold).
+    /// </summary>
+    private static bool EsNegrita(UglyToad.PdfPig.Content.Word palabra)
+    {
+        if (palabra.Letters.Count == 0)
+            return false;
+
+        var letra = palabra.Letters[0];
+
+        return letra.FontDetails?.IsBold == true
+            || (letra.FontName?.Contains("Bold", StringComparison.OrdinalIgnoreCase) ?? false)
+            || (letra.FontName?.Contains("Heavy", StringComparison.OrdinalIgnoreCase) ?? false)
+            || (letra.FontName?.Contains("Black", StringComparison.OrdinalIgnoreCase) ?? false);
     }
 
     /// <summary>
     /// Agrupa las palabras en líneas por su línea base (Y) y descarta los márgenes.
     /// </summary>
     private static List<Linea> ReconstruirLineas(Page pagina)
-    {
-        var limiteSuperior = pagina.Height * (1 - MargenSuperior);
-        var limiteInferior = pagina.Height * MargenInferior;
+        => ReconstruirLineas(ExtraerPalabras(pagina), pagina.Width, pagina.Height);
 
-        var palabras = pagina.GetWords(new NearestNeighbourWordExtractor(
-            new NearestNeighbourWordExtractor.NearestNeighbourWordExtractorOptions
-            {
-                MaximumDistance = DistanciaMaximaPalabra
-            }))
-            .Where(p => p.TextOrientation == TextOrientation.Horizontal)
-            .Where(p => p.BoundingBox.Top <= limiteSuperior)
-            .Where(p => p.BoundingBox.Bottom >= limiteInferior)
-            .Where(p => !string.IsNullOrWhiteSpace(p.Text))
-            .OrderByDescending(p => p.BoundingBox.Bottom)
+    /// <summary>
+    /// Mismo agrupamiento, pero sobre palabras que ya vienen de otro origen (por ejemplo el OCR).
+    /// </summary>
+    private static List<Linea> ReconstruirLineas(List<PalabraTexto> palabras, double anchoPagina, double altoPagina)
+    {
+        var limiteSuperior = altoPagina * (1 - MargenSuperior);
+        var limiteInferior = altoPagina * MargenInferior;
+
+        palabras = palabras
+            .Where(p => p.Superior <= limiteSuperior)
+            .Where(p => p.Inferior >= limiteInferior)
+            .OrderByDescending(p => p.Inferior)
             .ToList();
 
         if (palabras.Count == 0)
             return [];
 
         // Altura de letra típica: referencia para las tolerancias.
-        var alturas = palabras.Select(p => p.BoundingBox.Height).Where(h => h > 0).Order().ToList();
+        var alturas = palabras.Select(p => p.Alto).Where(h => h > 0).Order().ToList();
         var altoMedio = alturas.Count > 0 ? alturas[alturas.Count / 2] : 8;
 
         // Dos palabras están en la misma línea si su línea base coincide (± tolerancia).
@@ -237,13 +310,13 @@ public sealed class ServicioParserExamen : IServicioParserExamen
 
         // Un hueco horizontal enorme significa otro bloque de texto (por ejemplo una nota
         // en el margen derecho). A partir de ahí, son líneas distintas.
-        var huecoMaximo = Math.Max(50, pagina.Width * 0.10);
+        var huecoMaximo = Math.Max(50, anchoPagina * 0.10);
 
         var lineas = new List<Linea>();
 
         foreach (var palabra in palabras)
         {
-            var basePalabra = palabra.BoundingBox.Bottom;
+            var basePalabra = palabra.Inferior;
 
             // Entre las líneas con la misma base base, se sigue la que está más cerca
             // horizontalmente: así una nota del margen derecho no se pega a la opción.
@@ -254,7 +327,7 @@ public sealed class ServicioParserExamen : IServicioParserExamen
             {
                 var hueco = candidata.Palabras.Count == 0
                     ? 0
-                    : palabra.BoundingBox.Left - candidata.Palabras[^1].BoundingBox.Right;
+                    : palabra.Izquierda - candidata.Palabras[^1].Derecha;
 
                 if (hueco < mejorHueco)
                 {
@@ -273,7 +346,7 @@ public sealed class ServicioParserExamen : IServicioParserExamen
                     Palabras = [],
                     Texto = string.Empty,
                     Base = basePalabra,
-                    Izquierda = palabra.BoundingBox.Left,
+                    Izquierda = palabra.Izquierda,
                     Alto = altoMedio
                 };
                 lineas.Add(linea);
@@ -284,9 +357,9 @@ public sealed class ServicioParserExamen : IServicioParserExamen
 
         foreach (var linea in lineas)
         {
-            linea.Palabras.Sort((a, b) => a.BoundingBox.Left.CompareTo(b.BoundingBox.Left));
+            linea.Palabras.Sort((a, b) => a.Izquierda.CompareTo(b.Izquierda));
             linea.Texto = UnirPalabras(linea.Palabras, altoMedio);
-            linea.Izquierda = linea.Palabras[0].BoundingBox.Left;
+            linea.Izquierda = linea.Palabras[0].Izquierda;
             linea.Etiqueta = PatronEtiqueta.Match(linea.Texto);
             linea.Numero = PatronNumero.Match(linea.Texto);
             linea.XContenido = ObtenerInicioDelContenido(linea) ?? linea.Izquierda;
@@ -309,7 +382,7 @@ public sealed class ServicioParserExamen : IServicioParserExamen
 
         for (var i = 0; i < linea.Palabras.Count; i++)
         {
-            var palabra = linea.Palabras[i].Text.TrimStart('•', '·', '▪', '◦', '●', '*');
+            var palabra = linea.Palabras[i].Texto.TrimStart('•', '·', '▪', '◦', '●', '*');
 
             if (!palabra.StartsWith(letra, StringComparison.OrdinalIgnoreCase))
                 continue;
@@ -317,13 +390,13 @@ public sealed class ServicioParserExamen : IServicioParserExamen
             // La etiqueta puede ser una palabra pegada ("a)") o ir suelta ("A" + ")").
             var siguiente = i + 1;
 
-            while (siguiente < linea.Palabras.Count && EsSoloSeparador(linea.Palabras[siguiente].Text))
+            while (siguiente < linea.Palabras.Count && EsSoloSeparador(linea.Palabras[siguiente].Texto))
                 siguiente++;
 
             if (siguiente < linea.Palabras.Count)
-                return linea.Palabras[siguiente].BoundingBox.Left;
+                return linea.Palabras[siguiente].Izquierda;
 
-            return linea.Palabras[i].BoundingBox.Right;
+            return linea.Palabras[i].Derecha;
         }
 
         return null;
@@ -355,10 +428,10 @@ public sealed class ServicioParserExamen : IServicioParserExamen
     /// separadores de solo 0,2 pt) y, si se exige una fracción grande de la altura, las palabras
     /// se quedan soldadas ("Enelprocesode...").
     /// </remarks>
-    private static string UnirPalabras(List<Word> palabras, double altoMedio)
+    private static string UnirPalabras(List<PalabraTexto> palabras, double altoMedio)
     {
         var texto = new StringBuilder();
-        Word? anterior = null;
+        PalabraTexto? anterior = null;
 
         var umbral = Math.Max(0.3, altoMedio * 0.05);
 
@@ -366,13 +439,13 @@ public sealed class ServicioParserExamen : IServicioParserExamen
         {
             if (anterior is not null)
             {
-                var hueco = palabra.BoundingBox.Left - anterior.BoundingBox.Right;
+                var hueco = palabra.Izquierda - anterior.Derecha;
 
                 if (hueco > umbral)
                     texto.Append(' ');
             }
 
-            texto.Append(palabra.Text);
+            texto.Append(palabra.Texto);
             anterior = palabra;
         }
 
@@ -844,3 +917,5 @@ public sealed class ServicioParserExamen : IServicioParserExamen
             .ToList();
     }
 }
+
+

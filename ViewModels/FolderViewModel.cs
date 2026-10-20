@@ -37,6 +37,8 @@ public sealed class FolderViewModel : ViewModelBase
 
     public IRelayCommand PracticarTestFalladasCommand => _principal.PracticarTestFalladasCommand;
 
+    public IRelayCommand AbrirEditorCommand => _principal.AbrirEditorCommand;
+
     public IRelayCommand PracticarCarpetaCommand => _principal.PracticarCarpetaCommand;
 
     public IRelayCommand PracticarCarpetaFalladasCommand => _principal.PracticarCarpetaFalladasCommand;

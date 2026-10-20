@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Text;
 using Rpaso.Models;
 using Rpaso.Services;
@@ -7,13 +7,13 @@ using UglyToad.PdfPig.Content;
 namespace Rpaso;
 
 /// <summary>
-/// Modos de verificación por consola. Permiten probar el pipeline sin abrir la interfaz.
+/// Modos de verificaciÃ³n por consola. Permiten probar el pipeline sin abrir la interfaz.
 /// </summary>
 internal static class ModoVerificacion
 {
     /// <summary>
-    /// Muestra el texto extraído del PDF, página a página. Sirve para comprobar si el PDF
-    /// tiene capa de texto (si está escaneado, aquí saldría vacío).
+    /// Muestra el texto extraÃ­do del PDF, pÃ¡gina a pÃ¡gina. Sirve para comprobar si el PDF
+    /// tiene capa de texto (si estÃ¡ escaneado, aquÃ­ saldrÃ­a vacÃ­o).
     /// </summary>
     private static int MostrarTexto(string[] args)
     {
@@ -25,11 +25,11 @@ internal static class ModoVerificacion
 
         var paginas = new ServicioExtraccionPdf().ExtraerPaginasAsync(args[0]).GetAwaiter().GetResult();
 
-        Console.WriteLine($"Páginas con texto: {paginas.Count}");
+        Console.WriteLine($"PÃ¡ginas con texto: {paginas.Count}");
 
         for (var i = 0; i < paginas.Count; i++)
         {
-            Console.WriteLine($"\n========== PÁGINA {i + 1} ({paginas[i].Length} caracteres) ==========");
+            Console.WriteLine($"\n========== PÃGINA {i + 1} ({paginas[i].Length} caracteres) ==========");
             Console.WriteLine(paginas[i]);
         }
 
@@ -37,8 +37,8 @@ internal static class ModoVerificacion
     }
 
     /// <summary>
-    /// Vuelca la geometría de una página: palabras con sus coordenadas y altura de página.
-    /// Sirve para calibrar los márgenes y ver qué hay en cada zona.
+    /// Vuelca la geometrÃ­a de una pÃ¡gina: palabras con sus coordenadas y altura de pÃ¡gina.
+    /// Sirve para calibrar los mÃ¡rgenes y ver quÃ© hay en cada zona.
     /// </summary>
     private static int MostrarGeometria(string[] args)
     {
@@ -55,11 +55,11 @@ internal static class ModoVerificacion
 
         if (pagina is null)
         {
-            Console.WriteLine($"El documento no tiene página {numeroPagina}.");
+            Console.WriteLine($"El documento no tiene pÃ¡gina {numeroPagina}.");
             return 1;
         }
 
-        Console.WriteLine($"Página {numeroPagina}: {pagina.Width:F1} x {pagina.Height:F1} puntos");
+        Console.WriteLine($"PÃ¡gina {numeroPagina}: {pagina.Width:F1} x {pagina.Height:F1} puntos");
         Console.WriteLine($"Palabras: {pagina.GetWords().Count()}");
         Console.WriteLine();
         Console.WriteLine("Y superior   Y inferior  X izq   X der   Fuente                 Texto");
@@ -72,7 +72,7 @@ internal static class ModoVerificacion
             Console.WriteLine($"{caja.Top,9:F1} {caja.Bottom,10:F1} {caja.Left,7:F1} {caja.Right,7:F1}  {fuente,-22} {palabra.Text}");
         }
 
-        // Trazos vectoriales: así se dibujan las casillas marcadas de un test.
+        // Trazos vectoriales: asÃ­ se dibujan las casillas marcadas de un test.
         try
         {
             var trazos = pagina.Paths;
@@ -102,12 +102,12 @@ internal static class ModoVerificacion
         if (args.Length == 0 || !File.Exists(args[0]))
         {
             Console.WriteLine("Uso: Rpaso.exe --verificar <ruta.pdf>");
-            Console.WriteLine($"Parser: geométrico (sin IA)");
+            Console.WriteLine($"Parser: geomÃ©trico (sin IA)");
             return 1;
         }
 
         var servicio = new ServicioImportacion(
-            new ServicioParserExamen(),
+            new ServicioParserExamen(new ServicioOcrWindows()),
             new ServicioAlmacenamiento());
 
         var cronometro = Stopwatch.StartNew();
@@ -147,7 +147,7 @@ internal static class ModoVerificacion
     }
 
     /// <summary>
-    /// Muestra cómo el parser geométrico clasifica cada línea de una página.
+    /// Muestra cÃ³mo el parser geomÃ©trico clasifica cada lÃ­nea de una pÃ¡gina.
     /// </summary>
     private static int MostrarAnalisis(string[] args)
     {
@@ -160,7 +160,7 @@ internal static class ModoVerificacion
         var numeroPagina = args.Length > 1 && int.TryParse(args[1], out var n) ? n : 1;
         var parser = new ServicioParserExamen();
 
-        Console.WriteLine($"Página {numeroPagina}");
+        Console.WriteLine($"PÃ¡gina {numeroPagina}");
         Console.WriteLine("Tipo        Y base    X izq   X cont  Negrita  Texto");
         Console.WriteLine(new string('-', 122));
 
@@ -174,7 +174,7 @@ internal static class ModoVerificacion
     }
 
     /// <summary>
-    /// Importa varios PDFs y muestra el informe: qué se importó y por qué falló lo que falló.
+    /// Importa varios PDFs y muestra el informe: quÃ© se importÃ³ y por quÃ© fallÃ³ lo que fallÃ³.
     /// </summary>
     private static int ImportarVarios(string[] args)
     {
@@ -185,14 +185,14 @@ internal static class ModoVerificacion
         }
 
         var servicio = new ServicioImportacion(
-            new ServicioParserExamen(),
+            new ServicioParserExamen(new ServicioOcrWindows()),
             new ServicioAlmacenamiento());
 
         var cronometro = Stopwatch.StartNew();
         var informe = servicio.ImportarVariosAsync(args, "").GetAwaiter().GetResult();
 
         Console.WriteLine();
-        Console.WriteLine("══════ IMPORTACIÓN ══════");
+        Console.WriteLine("â•â•â•â•â•â• IMPORTACIÃ“N â•â•â•â•â•â•");
         Console.WriteLine($"Importados : {informe.TotalImportados} ({informe.TotalPreguntas} preguntas)");
         Console.WriteLine($"Fallidos   : {informe.TotalFallidos}");
         Console.WriteLine($"Tiempo     : {cronometro.ElapsedMilliseconds} ms");
@@ -208,8 +208,8 @@ internal static class ModoVerificacion
     }
 
     /// <summary>
-    /// Vuelca las letras de una página con el hueco horizontal respecto a la anterior.
-    /// Sirve para calibrar cuándo hay que poner un espacio entre palabras.
+    /// Vuelca las letras de una pÃ¡gina con el hueco horizontal respecto a la anterior.
+    /// Sirve para calibrar cuÃ¡ndo hay que poner un espacio entre palabras.
     /// </summary>
     private static int MostrarLetras(string[] args)
     {
@@ -260,3 +260,4 @@ internal static class ModoVerificacion
         _ => Ejecutar(args)
     };
 }
+

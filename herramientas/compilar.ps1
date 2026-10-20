@@ -32,8 +32,12 @@ try {
     & dotnet build --nologo -v q
     if ($LASTEXITCODE -ne 0) { throw "La compilación falló." }
 
-    Write-Host "==> Firmando..." -ForegroundColor Cyan
-    & powershell.exe -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "firmar.ps1") -Ruta ".\bin\$Configuracion\net10.0"
+    # La carpeta de salida incluye el TFM, que puede cambiar (net10.0, net10.0-windows...).
+    $tfm = (Select-String -Path "Rpaso.csproj" -Pattern "<TargetFramework>(?<t>[^<]+)</TargetFramework>").Matches[0].Groups["t"].Value
+    $salida = ".\bin\$Configuracion\$tfm"
+
+    Write-Host "==> Firmando ($salida)..." -ForegroundColor Cyan
+    & powershell.exe -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "firmar.ps1") -Ruta $salida
 
     Write-Host "`n==> Listo. Ejecuta: dotnet run" -ForegroundColor Green
 }

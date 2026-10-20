@@ -124,6 +124,17 @@
                                                 CommandParameter="{Binding}"
                                                 Content="Practicar" />
                                     </Grid>
+
+                                    <Button Classes="fantasma" HorizontalAlignment="Left" Padding="0,6"
+                                            Command="{Binding $parent[ItemsControl].((vm:FolderViewModel)DataContext).AbrirEditorCommand}"
+                                            CommandParameter="{Binding}">
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <PathIcon Data="M 11,1 L 15,1 L 15,15 L 11,15 Z M 4,4 L 8,4 L 8,8 L 4,8 Z M 4,10 L 8,10 L 8,14 L 4,14 Z"
+                                                      Foreground="{StaticResource BrushPrimario}" Width="13" Height="13" />
+                                            <TextBlock Text="Editar preguntas" FontSize="12" FontWeight="SemiBold"
+                                                       Foreground="{StaticResource BrushPrimario}" />
+                                        </StackPanel>
+                                    </Button>
                                 </StackPanel>
                             </Border>
                         </DataTemplate>

@@ -180,6 +180,31 @@ public sealed partial class MainViewModel : ViewModelBase
     }
 
     [RelayCommand]
+    private void AbrirEditor(TestViewModel? test)
+    {
+        if (test is null)
+            return;
+
+        var carpeta = Carpetas.FirstOrDefault(c => c.Tests.Contains(test));
+
+        VistaActual = new EditorTestViewModel(
+            test.Test,
+            GuardarTestEditado,
+            () => VistaActual = carpeta is null ? Inicio : new FolderViewModel(this, carpeta));
+    }
+
+    private async Task GuardarTestEditado(Test test)
+    {
+        await _almacenamiento.GuardarTestAsync(test);
+        await CargarDatosAsync();
+
+        var carpeta = Carpetas.FirstOrDefault(c => c.Id == test.CarpetaId);
+
+        VistaActual = carpeta is null ? Inicio : new FolderViewModel(this, carpeta);
+        Estado = $"Guardado «{test.Titulo}».";
+    }
+
+    [RelayCommand]
     private void PracticarTest(TestViewModel? test)
     {
         if (test is null)

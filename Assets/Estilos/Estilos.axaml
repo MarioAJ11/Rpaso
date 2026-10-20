@@ -1,4 +1,4 @@
-<Styles xmlns="https://github.com/avaloniaui"
+﻿<Styles xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
     <!-- ================= TIPOGRAFIA ================= -->
@@ -95,6 +95,14 @@
 
     <Style Selector="Button.primario:pointerover">
         <Setter Property="Background" Value="{StaticResource BrushPrimarioOscuro}" />
+    </Style>
+
+    <Style Selector="Button.primario:pressed">
+        <Setter Property="Background" Value="{StaticResource BrushPrimarioOscuro}" />
+    </Style>
+
+    <Style Selector="Button.primario:focus">
+        <Setter Property="Background" Value="{StaticResource BrushPrimario}" />
     </Style>
 
     <Style Selector="Button.peligro">
@@ -233,3 +241,4 @@
     </Style>
 
 </Styles>
+
