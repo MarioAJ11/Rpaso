@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using System.Text;
+using Rpaso.Models;
 using Rpaso.Services;
+using UglyToad.PdfPig.Content;
 
 namespace Rpaso;
 
@@ -109,7 +111,18 @@ internal static class ModoVerificacion
             new ServicioAlmacenamiento());
 
         var cronometro = Stopwatch.StartNew();
-        var test = servicio.ImportarAsync(args[0], "").GetAwaiter().GetResult();
+
+        Test test;
+        try
+        {
+            test = servicio.ImportarAsync(args[0], "").GetAwaiter().GetResult();
+        }
+        catch (InvalidOperationException ex)
+        {
+            Console.WriteLine();
+            Console.WriteLine($"No se pudo extraer nada: {ex.Message}");
+            return 2;
+        }
 
         Console.WriteLine();
         Console.WriteLine($"Test      : {test.Titulo}");
@@ -194,12 +207,56 @@ internal static class ModoVerificacion
         return informe.TotalFallidos > 0 ? 2 : 0;
     }
 
+    /// <summary>
+    /// Vuelca las letras de una página con el hueco horizontal respecto a la anterior.
+    /// Sirve para calibrar cuándo hay que poner un espacio entre palabras.
+    /// </summary>
+    private static int MostrarLetras(string[] args)
+    {
+        if (args.Length == 0 || !File.Exists(args[0]))
+        {
+            Console.WriteLine("Uso: Rpaso.exe --letras <ruta.pdf> [numPagina]");
+            return 1;
+        }
+
+        var numeroPagina = args.Length > 1 && int.TryParse(args[1], out var n) ? n : 1;
+
+        using var documento = UglyToad.PdfPig.PdfDocument.Open(args[0]);
+        var pagina = documento.GetPages().Skip(numeroPagina - 1).FirstOrDefault();
+
+        if (pagina is null)
+            return 1;
+
+        Console.WriteLine("Letra   X izq   X der   Hueco   Alto");
+        Console.WriteLine(new string('-', 52));
+
+        Letter? anterior = null;
+        var impresas = 0;
+
+        foreach (var letra in pagina.Letters.OrderBy(l => l.StartBaseLine.Y).ThenBy(l => l.Location.X))
+        {
+            if (impresas++ > 300)
+                break;
+
+            var hueco = anterior is null ? 0 : letra.Location.X - anterior!.Location.X;
+            var alto = letra.BoundingBox.Height;
+
+            if (hueco > 0.05 || anterior is null)
+                Console.WriteLine($"{letra.Value,-7} {letra.Location.X,7:F2} {letra.Location.X + letra.Width,7:F2} {hueco,7:F2} {alto,6:F2}");
+
+            anterior = letra;
+        }
+
+        return 0;
+    }
+
     public static int Ejecutar(string modo, string[] args) => modo switch
     {
         "--texto" => MostrarTexto(args),
         "--geometria" => MostrarGeometria(args),
         "--analizar" => MostrarAnalisis(args),
         "--importar" => ImportarVarios(args),
+        "--letras" => MostrarLetras(args),
         _ => Ejecutar(args)
     };
 }

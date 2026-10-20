@@ -113,6 +113,34 @@ PDF
 | Salto vertical entre líneas | Distinguir "continuación" de "pregunta nueva" |
 | `Letter.FontDetails.IsBold` | Detectar la opción correcta (en estos tests va en negrita) |
 
+### Separación de palabras (importante)
+
+PdfPig decide por su cuenta cuándo dos letras son la misma palabra, y su tolerancia por defecto es
+tan amplia que en algunos PDF deja el texto **soldado**: `Enelprocesodepolimerizacion`.
+
+La solución es pasarle un extractor propio con la distancia máxima de unión reducida a 0,5 pt:
+
+```csharp
+pagina.GetWords(new NearestNeighbourWordExtractor(
+    new NearestNeighbourWordExtractor.NearestNeighbourWordExtractorOptions
+    {
+        MaximumDistance = (_, _) => 0.5
+    }))
+```
+
+### Reglas de continuación
+
+Una línea sin letra puede ser la continuación de la anterior o una opción nueva. Se decide así:
+
+| Situación | Regla |
+| --- | --- |
+| La anterior era una opción | Es su continuación (aunque esté más a la derecha) |
+| La anterior era un enunciado **y la pregunta aún no tiene opciones** | Es la continuación del enunciado |
+| La anterior era un enunciado y ya había opciones | Es una opción nueva sin letra |
+| La anterior terminaba en `.` `?` `!` `:` `;` | Es una frase completa: lo que sigue es otra cosa |
+
+Una coma **no** cuenta como fin de frase, y las etiquetas `Correcta:` / `Incorrecta:` tampoco.
+
 ### Cómo se averigua la respuesta correcta
 
 Por orden de fiabilidad:

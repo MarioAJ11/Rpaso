@@ -4,6 +4,7 @@ using System.Text.RegularExpressions;
 using Rpaso.Models;
 using UglyToad.PdfPig;
 using UglyToad.PdfPig.Content;
+using UglyToad.PdfPig.DocumentLayoutAnalysis.WordExtractor;
 
 namespace Rpaso.Services;
 
@@ -212,7 +213,11 @@ public sealed class ServicioParserExamen : IServicioParserExamen
         var limiteSuperior = pagina.Height * (1 - MargenSuperior);
         var limiteInferior = pagina.Height * MargenInferior;
 
-        var palabras = pagina.GetWords()
+        var palabras = pagina.GetWords(new NearestNeighbourWordExtractor(
+            new NearestNeighbourWordExtractor.NearestNeighbourWordExtractorOptions
+            {
+                MaximumDistance = DistanciaMaximaPalabra
+            }))
             .Where(p => p.TextOrientation == TextOrientation.Horizontal)
             .Where(p => p.BoundingBox.Top <= limiteSuperior)
             .Where(p => p.BoundingBox.Bottom >= limiteInferior)
@@ -333,13 +338,29 @@ public sealed class ServicioParserExamen : IServicioParserExamen
     }
 
     /// <summary>
-    /// Une las palabras de una línea. Se mete un espacio si el hueco horizontal entre dos
-    /// palabras es mayor que una fracción de la altura de letra.
+    /// Distancia máxima (en puntos) para considerar que dos letras son la MISMA palabra.
+    /// PdfPig por defecto las une con una tolerancia bastante amplia, y hay PDF que colocan
+    /// las palabras casi pegadas: el resultado son textos como "Enelprocesodepolimerizacion".
+    /// Con 0,5 pt solo se soldan las letras realmente contiguas.
     /// </summary>
+    private static readonly Func<UglyToad.PdfPig.Content.Letter, UglyToad.PdfPig.Content.Letter, double> DistanciaMaximaPalabra
+        = (_, _) => 0.5;
+
+    /// <summary>
+    /// Une las palabras de una línea. Se mete un espacio si el hueco horizontal entre dos
+    /// palabras es mayor que un mínimo absoluto (0,3 pt) o que una fracción de la altura de letra.
+    /// </summary>
+    /// <remarks>
+    /// El mínimo absoluto importa: hay PDF que colocan las palabras pegadas (con kerning o
+    /// separadores de solo 0,2 pt) y, si se exige una fracción grande de la altura, las palabras
+    /// se quedan soldadas ("Enelprocesode...").
+    /// </remarks>
     private static string UnirPalabras(List<Word> palabras, double altoMedio)
     {
         var texto = new StringBuilder();
         Word? anterior = null;
+
+        var umbral = Math.Max(0.3, altoMedio * 0.05);
 
         foreach (var palabra in palabras)
         {
@@ -347,7 +368,7 @@ public sealed class ServicioParserExamen : IServicioParserExamen
             {
                 var hueco = palabra.BoundingBox.Left - anterior.BoundingBox.Right;
 
-                if (hueco > altoMedio * 0.15)
+                if (hueco > umbral)
                     texto.Append(' ');
             }
 
@@ -402,6 +423,7 @@ public sealed class ServicioParserExamen : IServicioParserExamen
         var anterior = (Linea?)null;
         var anteriorEraOpcion = false;
         var anteriorTerminaba = false;
+        var opcionesEnBloque = 0;
 
         foreach (var linea in lineas)
         {
@@ -441,6 +463,7 @@ public sealed class ServicioParserExamen : IServicioParserExamen
                 anterior = linea;
                 anteriorEraOpcion = true;
                 anteriorTerminaba = TerminaEnPuntuacion(linea.Texto);
+                opcionesEnBloque++;
                 continue;
             }
 
@@ -452,10 +475,18 @@ public sealed class ServicioParserExamen : IServicioParserExamen
 
             // Si la línea anterior ya terminó en puntuación, su frase está completa:
             // lo que viene detrás no puede ser su continuación.
+            //
+            // Las líneas con etiqueta ("a)") ya se han resuelto antes como opciones, así que
+            // aquí solo llegan líneas sin letra. Hay dos casos posibles:
+            //
+            //  a) Veníamos de una opción  -> es la continuación de esa opción (va sangrada).
+            //  b) Veníamos de un enunciado y la pregunta TODAVÍA NO tiene opciones
+            //     -> es la continuación del enunciado. Si ya tuviera opciones, sería
+            //        una opción nueva sin letra, y se decide por la sangría.
             var esContinuacion = dentroDeRango
                 && !anteriorTerminaba
                 && salto <= umbralContinuacion
-                && (anteriorEraOpcion || !EsOpcionPorSangria(linea, xOpcion, xPregunta));
+                && (anteriorEraOpcion || opcionesEnBloque == 0);
 
             if (esContinuacion)
             {
@@ -464,10 +495,12 @@ public sealed class ServicioParserExamen : IServicioParserExamen
             else if (EsOpcionPorSangria(linea, xOpcion, xPregunta))
             {
                 resultado.Add(new LineaClasificada { Linea = linea, Tipo = TipoLinea.Opcion, Letra = "" });
+                opcionesEnBloque++;
             }
             else
             {
                 resultado.Add(new LineaClasificada { Linea = linea, Tipo = TipoLinea.Enunciado });
+                opcionesEnBloque = 0;
             }
 
             anterior = linea;

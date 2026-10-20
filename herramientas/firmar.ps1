@@ -77,19 +77,38 @@ if (-not $ficheros) {
 
 Write-Host "Firmando $($ficheros.Count) fichero(s) en '$Ruta'..." -ForegroundColor Cyan
 
+# La marca de tiempo (contrafirma de una TSA) NO es opcional: Smart App Control exige que
+# la firma esté respaldada por una TSA de confianza. Sin ella, el binario se bloquea igual.
+$servidores = @(
+    "http://timestamp.digicert.com",
+    "http://timestamp.szoned.cz",
+    "http://timestamp.globalsign.com/tsa/r6advanced1"
+)
+
 foreach ($fichero in $ficheros) {
-    $resultado = Set-AuthenticodeSignature `
-        -FilePath $fichero.FullName `
-        -Certificate $cert `
-        -HashAlgorithm SHA256 `
-        -ErrorAction SilentlyContinue
+    $firmado = $false
 
-    $estado = (Get-AuthenticodeSignature $fichero.FullName).Status
+    foreach ($servidor in $servidores) {
+        Set-AuthenticodeSignature `
+            -FilePath $fichero.FullName `
+            -Certificate $cert `
+            -HashAlgorithm SHA256 `
+            -TimestampServer $servidor `
+            -ErrorAction SilentlyContinue | Out-Null
 
-    # Con un certificado autofirmado el estado sale "UnknownError" (la raíz no está en el
-    # almacén de confianza del equipo). Smart App Control lo acepta igual: solo exige que
-    # haya firma. Con el certificado de la CA corporativa sale "Valid".
-    Write-Host ("  {0,-14} {1}" -f $fichero.Name, $estado)
+        $estado = (Get-AuthenticodeSignature $fichero.FullName).Status
+        $conMarca = $null -ne (Get-AuthenticodeSignature $fichero.FullName).TimeStamperCertificate
+
+        if ($estado -eq "Valid" -and $conMarca) {
+            Write-Host ("  {0,-14} {1} (marcado: {2})" -f $fichero.Name, $estado, $servidor) -ForegroundColor DarkGray
+            $firmado = $true
+            break
+        }
+    }
+
+    if (-not $firmado) {
+        Write-Host ("  {0,-14} SIN FIRMA VALIDA" -f $fichero.Name) -ForegroundColor Red
+    }
 }
 
 Write-Host "Listo." -ForegroundColor Green
