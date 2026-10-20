@@ -6,6 +6,7 @@
         x:Class="Rpaso.Views.MainWindow"
         x:DataType="vm:MainViewModel"
         Title="Repaso"
+        Icon="/Assets/repaso.ico"
         Width="1320" Height="840"
         MinWidth="1060" MinHeight="680"
         Background="{StaticResource BrushFondo}"
@@ -21,9 +22,9 @@
             <Grid RowDefinitions="Auto,Auto,Auto,*,Auto">
 
                 <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="24,22,24,0" Spacing="10">
-                    <Border Width="36" Height="36" CornerRadius="10" Background="{StaticResource BrushPrimario}">
-                        <PathIcon Data="M 3,3 L 8,3 L 10,5 L 10,17 L 3,17 Z M 12,3 L 17,3 L 17,17 L 12,17 Z"
-                                  Foreground="White" Width="20" Height="20" />
+                    <Border Width="36" Height="36" CornerRadius="10"
+                            Background="{StaticResource BrushPrimario}" ClipToBounds="True">
+                        <Image Source="/Assets/repaso.ico" Stretch="UniformToFill" Width="36" Height="36" />
                     </Border>
                     <StackPanel Orientation="Horizontal" Spacing="1">
                         <TextBlock Text="repaso" Classes="marca" />

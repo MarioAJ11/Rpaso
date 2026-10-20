@@ -5,6 +5,8 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- Icono del ejecutable (explorador, barra de tareas) -->
+    <ApplicationIcon>Assets\repaso.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
