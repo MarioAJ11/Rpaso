@@ -92,9 +92,15 @@ PDF
 
 ### Cómo se averigua la respuesta correcta
 
-1. **Clave numérica** en el PDF (`Respuestas: 1-b, 2-c`) → manda esa.
-2. **Opción en negrita**: si hay exactamente una, esa es la correcta.
-3. Si no hay ninguna, se usa la primera opción.
+Por orden de fiabilidad:
+
+1. **Marca explícita del PDF**:
+   - `Correcta:` delante del texto de la opción → esa es la buena.
+   - `Respuesta correcta` en el margen derecho → esa es la buena.
+   - `Incorrecta:` → esa es la mala (informativo, no se usa como clave).
+2. **Clave numérica** en el PDF (`Respuestas: 1-b, 2-c`).
+3. **Opción en negrita**: si hay exactamente una, esa es la correcta.
+4. Si no hay ninguna, se usa la primera opción.
 
 > La negrita se lee de `FontDetails.IsBold`, **no** del nombre de la fuente: el prefijo de
 > subconjunto (`DAAAAA+Times`) se asigna por orden de aparición y no dice nada.
@@ -102,6 +108,19 @@ PDF
 > No todos los exams marcan la respuesta en negrita. De los PDFs revisados, 3 sí lo hacen
 > (MEGATEST, TEST-TEORIA, Tests-Respuestas) y 4 no (Tema-2, los de Kansei, Test-1-parcial):
 > en esos la clave cae en la primera opción hasta que se corrija a mano.
+
+### Formatos de PDF soportados
+
+| Formato | Cómo se detecta |
+| --- | --- |
+| Opciones con letra (`a)`, `b.` …) | Etiqueta al inicio de la línea |
+| Opciones sin letra (una línea por opción) | Sangría en X respecto a la columna del enunciado |
+| `• A) texto` con viñeta | La viñeta se admite delante de la etiqueta |
+| Campus virtual (`Correcta:` / `Incorrecta:` + `Respuesta correcta` a la derecha) | Las marcas del propio PDF |
+| Opciones partidas en varias líneas | Se unen por rango de X y salto vertical |
+| Enunciado partido en dos líneas | Se unen salvo que la anterior termine en puntuación |
+| `Pregunta N` como encabezado | Se ignora: no es una pregunta |
+| Nota en el margen derecho | Se parte la línea en los huecos horizontales grandes |
 
 ### Rendimiento real medido
 

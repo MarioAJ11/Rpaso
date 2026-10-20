@@ -17,7 +17,7 @@ Leyenda: ✅ implementado · 🟡 parcial · ⬜ pendiente
 | Detectar preguntas y opciones | ✅ | Por etiqueta (`a)`, `b.`) **y** por sangría en X cuando no hay letra |
 | Reconstruir texto partido | ✅ | Une continuación de enunciado y de opción por rango de X y salto vertical |
 | Ordenar documentos a dos columnas | ⬜ | No implementado. **Los PDFs propios revisados son de una columna** (verificado) |
-| Encontrar respuestas correctas | 🟡 | Clave numérica (`Respuestas: 1-b`) + **opción en negrita**. No se detectan marcas dibujadas |
+| Encontrar respuestas correctas | ✅ | Clave numérica (`Respuestas: 1-b`), marcas del PDF (`Correcta:` / `Incorrecta:` / `Respuesta correcta` en el margen derecho) y, como último recurso, la opción en negrita |
 | Conservar una alternativa de parseo | ⬜ | No aplica: solo hay un parser |
 | Informar de PDFs que no se pueden procesar | ✅ | El informe de importación dice el motivo: escaneo sin texto, archivo inválido, sin preguntas… |
 

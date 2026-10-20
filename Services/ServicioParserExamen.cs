@@ -31,6 +31,12 @@ public sealed class ServicioParserExamen : IServicioParserExamen
     private const double ToleranciaHorizontal = 3.0;
 
     /// <summary>
+    /// Margen horizontal máximo (en puntos) para que una línea sea continuación de la anterior.
+    /// Cubre el sangrado colgante típico de las PDFs de campus virtual.
+    /// </summary>
+    private const double VentanaContinuacion = 80;
+
+    /// <summary>
     /// Etiqueta de opción: "a)", "b.", "c:", "d -". Se admite una viñeta delante
     /// ("• a) texto"), habitual en los PDF de exams.
     /// </summary>
@@ -60,6 +66,30 @@ public sealed class ServicioParserExamen : IServicioParserExamen
     private static readonly Regex PatronEncabezado = new(
         @"^\s*(Pregunta|Question)\s*\d{1,3}\s*[:.]?\s*$",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    /// <summary>
+    /// Marca que aparece en el margen derecho de la opción correcta: "Respuesta correcta".
+    /// </summary>
+    private static readonly Regex PatronMarcaRespuesta = new(
+        @"(?i)\bRespuesta\s+correcta\b",
+        RegexOptions.Compiled);
+
+    /// <summary>
+    /// Prefijo que el PDF pone delante de la opción: "Correcta:" o "Incorrecta:".
+    /// </summary>
+    private static readonly Regex PatronPrefijoVeredicto = new(
+        @"^\s*(?<veredicto>Correcta|Incorrecta)\s*:\s*",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    /// <summary>Botón de radio: relleno indica lo que eligió el alumno, no la respuesta correcta.</summary>
+    private static readonly Regex PatronRadio = new(
+        @"^\s*[○◉●⦿⭘◯⭑•]\s*",
+        RegexOptions.Compiled);
+
+    /// <summary>La línea termina con la etiqueta de veredicto: "Correcta:" / "Incorrecta:".</summary>
+    private static readonly Regex PatronVeredictoFinal = new(
+        @"(?i)\b(correcta|incorrecta)\s*:\s*$",
+        RegexOptions.Compiled);
 
     /// <summary>Nombres de archivo: sueles ser la portada del PDF, no una pregunta.</summary>
     private static readonly Regex PatronArchivo = new(
@@ -154,6 +184,9 @@ public sealed class ServicioParserExamen : IServicioParserExamen
         /// </summary>
         public double XContenido { get; set; }
 
+        /// <summary>True si la línea contiene la marca "Respuesta correcta".</summary>
+        public bool ContieneMarcaRespuesta => PatronMarcaRespuesta.IsMatch(Texto);
+
         /// <summary>
         /// True si alguna palabra de la línea está en negrita. En estos tests la opción
         /// correcta es la única en negrita.
@@ -197,13 +230,36 @@ public sealed class ServicioParserExamen : IServicioParserExamen
         // Dos palabras están en la misma línea si su línea base coincide (± tolerancia).
         var toleranciaLinea = Math.Max(1.5, altoMedio * 0.4);
 
+        // Un hueco horizontal enorme significa otro bloque de texto (por ejemplo una nota
+        // en el margen derecho). A partir de ahí, son líneas distintas.
+        var huecoMaximo = Math.Max(50, pagina.Width * 0.10);
+
         var lineas = new List<Linea>();
 
         foreach (var palabra in palabras)
         {
             var basePalabra = palabra.BoundingBox.Bottom;
 
-            var linea = lineas.FirstOrDefault(l => Math.Abs(l.Base - basePalabra) <= toleranciaLinea);
+            // Entre las líneas con la misma base base, se sigue la que está más cerca
+            // horizontalmente: así una nota del margen derecho no se pega a la opción.
+            Linea? linea = null;
+            var mejorHueco = double.MaxValue;
+
+            foreach (var candidata in lineas.Where(l => Math.Abs(l.Base - basePalabra) <= toleranciaLinea))
+            {
+                var hueco = candidata.Palabras.Count == 0
+                    ? 0
+                    : palabra.BoundingBox.Left - candidata.Palabras[^1].BoundingBox.Right;
+
+                if (hueco < mejorHueco)
+                {
+                    mejorHueco = hueco;
+                    linea = candidata;
+                }
+            }
+
+            if (linea is not null && mejorHueco > huecoMaximo)
+                linea = null;
 
             if (linea is null)
             {
@@ -311,7 +367,8 @@ public sealed class ServicioParserExamen : IServicioParserExamen
         Enunciado,
         Opcion,
         Continuacion,
-        Encabezado
+        Encabezado,
+        MarcaRespuesta
     }
 
     private sealed class LineaClasificada
@@ -353,6 +410,17 @@ public sealed class ServicioParserExamen : IServicioParserExamen
 
             var salto = anterior is null ? 0 : anterior.Base - linea.Base;
 
+            // 0b) Línea con la marca "Respuesta correcta" en el margen derecho: no es una
+            //     opción, es la etiqueta que identifica la respuesta correcta.
+            if (linea.Etiqueta is not { Success: true } && PatronMarcaRespuesta.IsMatch(linea.Texto))
+            {
+                resultado.Add(new LineaClasificada { Linea = linea, Tipo = TipoLinea.MarcaRespuesta });
+                anterior = linea;
+                anteriorEraOpcion = false;
+                anteriorTerminaba = true;
+                continue;
+            }
+
             // 0) Un encabezado de bloque ("Pregunta 1") no es una pregunta: se ignora,
             //    pero no corta la pregunta anterior ni abre una nueva.
             if (PatronEncabezado.IsMatch(linea.Texto))
@@ -380,7 +448,7 @@ public sealed class ServicioParserExamen : IServicioParserExamen
             // con el texto (sangrado colgante), así que se comprueba un RANGO, no una igualdad.
             var dentroDeRango = anterior is not null
                 && linea.Izquierda >= anterior.Izquierda - ToleranciaHorizontal
-                && linea.Izquierda <= anterior.XContenido + ToleranciaHorizontal;
+                && linea.Izquierda <= Math.Max(anterior.XContenido, anterior.Izquierda + VentanaContinuacion);
 
             // Si la línea anterior ya terminó en puntuación, su frase está completa:
             // lo que viene detrás no puede ser su continuación.
@@ -425,6 +493,11 @@ public sealed class ServicioParserExamen : IServicioParserExamen
     {
         var recortado = texto.TrimEnd();
 
+        // "A. Correcta:" NO termina la frase: es una etiqueta y el texto de la opción
+        // viene en la línea siguiente.
+        if (PatronVeredictoFinal.IsMatch(recortado))
+            return false;
+
         return recortado.Length > 0
             && (recortado[^1] is '.' or '?' or '!' or ':' or ';');
     }
@@ -460,6 +533,12 @@ public sealed class ServicioParserExamen : IServicioParserExamen
         public required string Letra { get; init; }
         public required string Texto { get; set; }
         public bool Negrita { get; set; }
+
+        /// <summary>True si el PDF marca esta opción como la correcta.</summary>
+        public bool EsCorrecta { get; set; }
+
+        /// <summary>True si el PDF dice explícitamente que esta opción es incorrecta.</summary>
+        public bool EsIncorrecta { get; set; }
     }
 
     private sealed class PreguntaEnCurso
@@ -493,15 +572,24 @@ public sealed class ServicioParserExamen : IServicioParserExamen
             if (clasificada.Tipo == TipoLinea.Opcion)
             {
                 var indice = actual?.Opciones.Count ?? 0;
-                var (letra, texto) = ExtraerOpcion(linea, indice);
+                var opcion = ExtraerOpcion(linea, indice);
 
-                if (letra.Length > 0)
-                    actual?.Opciones.Add(new OpcionEnCurso
-                    {
-                        Letra = letra,
-                        Texto = texto,
-                        Negrita = linea.Negrita
-                    });
+                if (opcion.Letra.Length == 0)
+                    continue;
+
+                // La marca puede venir en la misma línea de la opción.
+                if (linea.ContieneMarcaRespuesta)
+                    opcion.EsCorrecta = true;
+
+                actual?.Opciones.Add(opcion);
+                continue;
+            }
+
+            if (clasificada.Tipo == TipoLinea.MarcaRespuesta)
+            {
+                // La marca identifica la última opción añadida: esa es la correcta.
+                if (actual is not null && actual.Opciones.Count > 0)
+                    actual.Opciones[^1].EsCorrecta = true;
 
                 continue;
             }
@@ -552,17 +640,50 @@ public sealed class ServicioParserExamen : IServicioParserExamen
             CerrarPregunta(actual, preguntas, numeros);
     }
 
-    private static (string Letra, string Texto) ExtraerOpcion(Linea linea, int indice)
+    private static OpcionEnCurso ExtraerOpcion(Linea linea, int indice)
     {
+        var letra = "";
+        var texto = linea.Texto;
+
         if (linea.Etiqueta is { Success: true })
         {
-            var letra = linea.Etiqueta.Groups["letra"].Value.ToLowerInvariant();
-            return (letra, linea.Etiqueta.Groups["texto"].Value.Trim());
+            letra = linea.Etiqueta.Groups["letra"].Value.ToLowerInvariant();
+            texto = linea.Etiqueta.Groups["texto"].Value.Trim();
         }
 
-        // Opción sin letra: se le asigna la siguiente por orden.
-        var siguiente = (char)('a' + Math.Min(indice, 4));
-        return (siguiente.ToString(), linea.Texto);
+        // Botón de radio: indica lo que eligió el alumno, no la respuesta correcta.
+        texto = PatronRadio.Replace(texto, "").Trim();
+
+        // "Respuesta correcta" va en el margen derecho de la misma línea.
+        texto = PatronMarcaRespuesta.Replace(texto, "").Trim();
+
+        var esCorrecta = false;
+        var esIncorrecta = false;
+
+        // Prefijo "Correcta:" / "Incorrecta:".
+        var veredicto = PatronPrefijoVeredicto.Match(texto);
+
+        if (veredicto.Success)
+        {
+            esCorrecta = veredicto.Groups["veredicto"].Value.Equals("Correcta", StringComparison.OrdinalIgnoreCase);
+            esIncorrecta = !esCorrecta;
+            texto = texto[veredicto.Length..].Trim();
+        }
+
+        if (letra.Length == 0)
+        {
+            // Opción sin letra: se le asigna la siguiente por orden.
+            letra = ((char)('a' + Math.Min(indice, 4))).ToString();
+        }
+
+        return new OpcionEnCurso
+        {
+            Letra = letra,
+            Texto = texto,
+            Negrita = linea.Negrita,
+            EsCorrecta = esCorrecta,
+            EsIncorrecta = esIncorrecta
+        };
     }
 
     private static void CerrarPregunta(
@@ -579,13 +700,25 @@ public sealed class ServicioParserExamen : IServicioParserExamen
 
         var id = $"q-{preguntas.Count + 1}";
 
-        // La clave de respuesta: si hay una clave numerada en el examen se aplica después.
-        // Si no, la usa la negrita: en estos tests la opción correcta es la única en negrita.
+        // La clave de respuesta, por orden de fiabilidad:
+        //  1. Marca explícita del PDF ("Correcta:" o "Respuesta correcta").
+        //  2. La única opción en negrita.
+        //  3. La primera opción.
         var clave = enCurso.Opciones[0].Letra;
-        var negritas = enCurso.Opciones.Where(o => o.Negrita).ToList();
 
-        if (negritas.Count == 1)
-            clave = negritas[0].Letra;
+        var marcadas = enCurso.Opciones.Where(o => o.EsCorrecta).ToList();
+
+        if (marcadas.Count == 1)
+        {
+            clave = marcadas[0].Letra;
+        }
+        else
+        {
+            var negritas = enCurso.Opciones.Where(o => o.Negrita).ToList();
+
+            if (negritas.Count == 1)
+                clave = negritas[0].Letra;
+        }
 
         preguntas.Add(new Pregunta(
             id,
