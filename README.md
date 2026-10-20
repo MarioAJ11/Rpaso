@@ -14,10 +14,31 @@ las coordenadas del texto. No hay modelos, ni claves de API, ni conexión a inte
 ## Puesta en marcha
 
 ```powershell
+.\herramientas\compilar.ps1      # compila y firma (ver la nota de Windows 11)
 dotnet run
 ```
 
 Sin más dependencias: no hay modelos que descargar ni que instalar.
+
+### ⚠️ Firmado de binarios en Windows 11 (obligatorio)
+
+Windows 11 distribuye la política de Code Integrity `VerifiedAndReputableDesktopFlightSupplemental`,
+que **exige que el ejecutable esté firmado** (o tenga reputación en la nube de Microsoft). Un binario
+recién compilado no la tiene, y Windows lo bloquea con:
+
+```
+Una directiva de Control de aplicaciones bloqueó este archivo. (0x800711C7)
+```
+
+Es lo que hace que la app funcione un día y al siguiente no: la política se refresca con Windows
+Update y el binario cambia de hash en cada compilación.
+
+`herramientas\firmar.ps1` crea un certificado autofirmado en el almacén del usuario (suficiente para
+desarrollo) y firma `Rpaso.exe` y `Rpaso.dll`.
+
+> **Para distribuir al público** hace falta un **certificado de firma de código comercial**: el
+> autofirmado solo vale en el equipo donde se creó. En un entorno corporativo debe emitirlo la CA
+> de la empresa.
 
 ### Verificar el pipeline por consola
 
@@ -45,9 +66,11 @@ dotnet run -- --analizar "C:\ruta\a\tu\examen.pdf" 2
 
 ```powershell
 dotnet publish -c Release -r win-x64 --self-contained true -o publicacion
+powershell -ExecutionPolicy Bypass -File .\herramientas\firmar.ps1 -Ruta .\publicacion
 ```
 
 El usuario final solo hace **doble clic** en `Rpaso.exe`: no necesita instalar .NET ni nada más.
+**Firmarlo es obligatorio** en equipos con Smart App Control (ver la nota de arriba).
 
 ---
 
