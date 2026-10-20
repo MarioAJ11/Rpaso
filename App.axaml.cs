@@ -30,7 +30,7 @@ public partial class App : Application
             var viewModel = new MainViewModel(
                 almacenamiento,
                 importacion,
-                () => SeleccionarPdfAsync(ventana));
+                () => SeleccionarPdfsAsync(ventana));
 
             ventana.DataContext = viewModel;
             desktop.MainWindow = ventana;
@@ -50,8 +50,20 @@ public partial class App : Application
     {
         var vista = Environment.GetEnvironmentVariable("RPASO_TEST_VISTA");
 
-        if (vista is not ("carpeta" or "quiz" or "quiz-corregido"))
+        if (vista is not ("carpeta" or "quiz" or "quiz-corregido" or "informe"))
             return;
+
+        // Modo informe: importa los PDFs de RPASO_TEST_PDFS (separados por ';') y muestra el informe.
+        if (vista == "informe")
+        {
+            var rutas = (Environment.GetEnvironmentVariable("RPASO_TEST_PDFS") ?? string.Empty)
+                .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+            if (rutas.Length > 0)
+                await viewModel.ImportarVariosAsync(rutas);
+
+            return;
+        }
 
         await viewModel.CargarDatosAsync();
 
@@ -77,18 +89,22 @@ public partial class App : Application
     /// Abre el diálogo de selección de archivos. Vive en la capa de presentación porque
     /// necesita el StorageProvider de la ventana; el ViewModel solo recibe una función.
     /// </summary>
-    private static async Task<string?> SeleccionarPdfAsync(Window ventana)
+    private static async Task<IReadOnlyList<string>> SeleccionarPdfsAsync(Window ventana)
     {
         var archivos = await ventana.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
         {
-            Title = "Selecciona un PDF de examen",
-            AllowMultiple = false,
+            Title = "Selecciona uno o varios PDF de examen",
+            AllowMultiple = true,
             FileTypeFilter =
             [
                 new FilePickerFileType("Documentos PDF") { Patterns = ["*.pdf"] }
             ]
         });
 
-        return archivos.Count == 0 ? null : archivos[0].TryGetLocalPath();
+        return archivos
+            .Select(archivo => archivo.TryGetLocalPath())
+            .Where(ruta => !string.IsNullOrWhiteSpace(ruta))
+            .Select(ruta => ruta!)
+            .ToList();
     }
 }

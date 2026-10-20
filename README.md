@@ -25,13 +25,16 @@ Sin más dependencias: no hay modelos que descargar ni que instalar.
 # Resultado completo: preguntas, opciones y claves
 dotnet run -- --verificar "C:\ruta\a\tu\examen.pdf"
 
+# Importar varios y ver el informe de fallos
+dotnet run -- --importar "a.pdf" "b.pdf" "c.pdf"
+
 # Texto crudo que sale del PDF (para ver si tiene capa de texto)
 dotnet run -- --texto "C:\ruta\a\tu\examen.pdf"
 
 # Geometría: cada palabra con su X y su Y
 dotnet run -- --geometria "C:\ruta\a\tu\examen.pdf" 2
 
-# Cómo clasifica el parser cada línea (enunciado / opción / continuación)
+# Cómo clasifica el parser cada línea (enunciado / opción / continuación / encabezado)
 dotnet run -- --analizar "C:\ruta\a\tu\examen.pdf" 2
 ```
 

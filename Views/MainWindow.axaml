@@ -1,6 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:Rpaso.ViewModels"
+        xmlns:views="using:Rpaso.Views"
         xmlns:conv="using:Avalonia.Data.Converters"
         x:Class="Rpaso.Views.MainWindow"
         x:DataType="vm:MainViewModel"
@@ -181,6 +182,11 @@
                     </StackPanel>
                 </StackPanel>
             </Border>
+        </Border>
+
+        <!-- ==================== MODAL: INFORME DE IMPORTACIÓN ==================== -->
+        <Border Grid.ColumnSpan="2" Background="#66000000" IsVisible="{Binding MostrarInformeImportacion}">
+            <views:InformeImportacionView DataContext="{Binding InformeImportacion}" />
         </Border>
 
     </Grid>

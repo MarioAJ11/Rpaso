@@ -66,7 +66,7 @@ public sealed class ServicioParserExamen : IServicioParserExamen
         @"\.(pdf|docx?|txt|png|jpe?g|odt|zip|xlsx?|pptx?)$",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-    public async Task<Test> AnalizarAsync(string rutaPdf, string carpetaId, CancellationToken ct = default)
+    public async Task<AnalisisExamen> AnalizarAsync(string rutaPdf, string carpetaId, CancellationToken ct = default)
     {
         if (!File.Exists(rutaPdf))
             throw new FileNotFoundException("No se encontró el archivo PDF.", rutaPdf);
@@ -74,6 +74,9 @@ public sealed class ServicioParserExamen : IServicioParserExamen
         var preguntas = new List<Pregunta>();
         var claves = new Dictionary<int, string>();
         var numeros = new Dictionary<string, int>();
+        var paginasConTexto = 0;
+        var paginasTotales = 0;
+        var lineasTotales = 0;
 
         // PdfPig es síncrono: se ejecuta en un hilo de fondo para no bloquear la interfaz.
         await Task.Run(() =>
@@ -84,20 +87,50 @@ public sealed class ServicioParserExamen : IServicioParserExamen
             {
                 ct.ThrowIfCancellationRequested();
 
+                paginasTotales++;
+
                 var lineas = ReconstruirLineas(pagina);
+
+                if (lineas.Count > 0)
+                    paginasConTexto++;
+
+                lineasTotales += lineas.Count;
                 InterpretarLineas(lineas, preguntas, numeros, claves);
             }
         }, ct);
 
         AplicarClaves(preguntas, numeros, claves);
 
-        return new Test(
+        var test = new Test(
             Id: $"t-{Guid.NewGuid():N}"[..12],
             Titulo: Path.GetFileNameWithoutExtension(rutaPdf),
             CarpetaId: carpetaId,
             FechaImportacion: DateTimeOffset.Now,
             ArchivoOrigen: Path.GetFileName(rutaPdf),
             Preguntas: preguntas);
+
+        return new AnalisisExamen(test, CalcularAviso(paginasTotales, paginasConTexto, lineasTotales, preguntas.Count));
+    }
+
+    /// <summary>
+    /// Explica por qué un PDF no ha producido preguntas. Se muestra al usuario en el informe
+    /// de importación para que sepa si tiene que corregir el archivo o revisar la app.
+    /// </summary>
+    private static string? CalcularAviso(int paginasTotales, int paginasConTexto, int lineasTotales, int preguntas)
+    {
+        if (preguntas > 0)
+            return null;
+
+        if (paginasTotales == 0)
+            return "El PDF no tiene páginas.";
+
+        if (paginasConTexto == 0)
+            return "Es un PDF escaneado: no tiene capa de texto (necesita OCR).";
+
+        if (lineasTotales == 0)
+            return "El texto está fuera del área imprimible de la página.";
+
+        return $"Se han leído {lineasTotales} líneas pero ninguna forma una pregunta con sus opciones.";
     }
 
     // ---------------------------------------------------------------------

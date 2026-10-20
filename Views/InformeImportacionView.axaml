@@ -1,0 +1,75 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Rpaso.ViewModels"
+             x:Class="Rpaso.Views.InformeImportacionView"
+             x:DataType="vm:InformeImportacionViewModel">
+
+    <Border Background="{StaticResource BrushSuperficie}"
+            BorderBrush="{StaticResource BrushBorde}" BorderThickness="1"
+            CornerRadius="20"
+            Width="560"
+            MaxHeight="640"
+            Padding="26"
+            HorizontalAlignment="Center"
+            VerticalAlignment="Center">
+
+        <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto">
+
+            <StackPanel Grid.Row="0" Spacing="6" Margin="0,0,0,18">
+                <TextBlock Text="{Binding Titulo}" Classes="subtitulo" />
+                <TextBlock Text="{Binding Resumen}" Classes="tenue" />
+            </StackPanel>
+
+            <!-- Importados -->
+            <StackPanel Grid.Row="1" Spacing="8" Margin="0,0,0,14" IsVisible="{Binding HayImportados}">
+                <TextBlock Text="IMPORTADOS" Classes="etiqueta" />
+                <Border Background="{StaticResource BrushExitoSuave}" CornerRadius="12" Padding="4">
+                    <ItemsControl ItemsSource="{Binding Importados}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:ResultadoImportacionViewModel">
+                                <Grid ColumnDefinitions="Auto,*,Auto" Margin="10,7">
+                                    <PathIcon Grid.Column="0" Data="M 4,10 L 8,14 L 16,6 L 15,5 L 8,12 L 5,9 Z"
+                                              Foreground="{StaticResource BrushExito}" Width="16" Height="16" />
+                                    <TextBlock Grid.Column="1" Text="{Binding NombreArchivo}" FontSize="13"
+                                               FontWeight="SemiBold" Margin="10,0" VerticalAlignment="Center"
+                                               TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Grid.Column="2" Text="{Binding Detalle}" Classes="micro"
+                                               Foreground="{StaticResource BrushExito}" VerticalAlignment="Center" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </Border>
+            </StackPanel>
+
+            <!-- Fallidos -->
+            <StackPanel Grid.Row="2" Spacing="8" Margin="0,0,0,18" IsVisible="{Binding HayFallidos}">
+                <TextBlock Text="NO SE HAN PODIDO IMPORTAR" Classes="etiqueta"
+                           Foreground="{StaticResource BrushError}" />
+                <Border Background="{StaticResource BrushErrorSuave}" CornerRadius="12" Padding="4">
+                    <ItemsControl ItemsSource="{Binding Fallidos}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:ResultadoImportacionViewModel">
+                                <Grid ColumnDefinitions="Auto,*" Margin="10,7">
+                                    <PathIcon Grid.Column="0" Data="M 5,5 L 7,5 L 10,8 L 13,5 L 15,5 L 11,10 L 15,15 L 13,15 L 10,12 L 7,15 L 5,15 L 9,10 Z"
+                                              Foreground="{StaticResource BrushError}" Width="15" Height="15" />
+                                    <StackPanel Grid.Column="1" Margin="10,0" Spacing="2">
+                                        <TextBlock Text="{Binding NombreArchivo}" FontSize="13"
+                                                   FontWeight="SemiBold" TextWrapping="Wrap" />
+                                        <TextBlock Text="{Binding Detalle}" FontSize="12" TextWrapping="Wrap"
+                                                   Foreground="{StaticResource BrushError}" />
+                                    </StackPanel>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </Border>
+            </StackPanel>
+
+            <Border Grid.Row="3" Height="1" Background="{StaticResource BrushBordeSuave}" Margin="0,0,0,18" />
+
+            <Button Grid.Row="4" Content="Cerrar" Classes="primario" HorizontalAlignment="Right"
+                    Command="{Binding CerrarCommand}" />
+        </Grid>
+    </Border>
+</UserControl>

@@ -160,11 +160,46 @@ internal static class ModoVerificacion
         return 0;
     }
 
+    /// <summary>
+    /// Importa varios PDFs y muestra el informe: qué se importó y por qué falló lo que falló.
+    /// </summary>
+    private static int ImportarVarios(string[] args)
+    {
+        if (args.Length == 0)
+        {
+            Console.WriteLine("Uso: Rpaso.exe --importar <ruta1.pdf> [ruta2.pdf ...]");
+            return 1;
+        }
+
+        var servicio = new ServicioImportacion(
+            new ServicioParserExamen(),
+            new ServicioAlmacenamiento());
+
+        var cronometro = Stopwatch.StartNew();
+        var informe = servicio.ImportarVariosAsync(args, "").GetAwaiter().GetResult();
+
+        Console.WriteLine();
+        Console.WriteLine("══════ IMPORTACIÓN ══════");
+        Console.WriteLine($"Importados : {informe.TotalImportados} ({informe.TotalPreguntas} preguntas)");
+        Console.WriteLine($"Fallidos   : {informe.TotalFallidos}");
+        Console.WriteLine($"Tiempo     : {cronometro.ElapsedMilliseconds} ms");
+        Console.WriteLine();
+
+        foreach (var resultado in informe.Importados)
+            Console.WriteLine($"  [OK]   {resultado.NombreArchivo,-55} {resultado.TotalPreguntas,4} preguntas");
+
+        foreach (var resultado in informe.Fallidos)
+            Console.WriteLine($"  [FALLO] {resultado.NombreArchivo,-55} {resultado.MensajeError}");
+
+        return informe.TotalFallidos > 0 ? 2 : 0;
+    }
+
     public static int Ejecutar(string modo, string[] args) => modo switch
     {
         "--texto" => MostrarTexto(args),
         "--geometria" => MostrarGeometria(args),
         "--analizar" => MostrarAnalisis(args),
+        "--importar" => ImportarVarios(args),
         _ => Ejecutar(args)
     };
 }

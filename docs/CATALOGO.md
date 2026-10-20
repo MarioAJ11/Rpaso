@@ -19,7 +19,7 @@ Leyenda: ✅ implementado · 🟡 parcial · ⬜ pendiente
 | Ordenar documentos a dos columnas | ⬜ | No implementado. **Los PDFs propios revisados son de una columna** (verificado) |
 | Encontrar respuestas correctas | 🟡 | Clave numérica (`Respuestas: 1-b`) + **opción en negrita**. No se detectan marcas dibujadas |
 | Conservar una alternativa de parseo | ⬜ | No aplica: solo hay un parser |
-| Informar de PDFs que no se pueden procesar | 🟡 | El modo consola avisa; la app aún no lo muestra |
+| Informar de PDFs que no se pueden procesar | ✅ | El informe de importación dice el motivo: escaneo sin texto, archivo inválido, sin preguntas… |
 
 ### Detalle: cómo se detecta la respuesta correcta
 
@@ -38,7 +38,7 @@ Leyenda: ✅ implementado · 🟡 parcial · ⬜ pendiente
 | Función | Estado | Notas |
 | --- | --- | --- |
 | Guardar datos localmente | ✅ | JSON en `%APPDATA%\Rpaso` (carpetas, tests, progreso) |
-| Importar uno o varios PDF | 🟡 | Uno a la vez. Falta importación múltiple con informe de fallos |
+| Importar uno o varios PDF | ✅ | Selección múltiple y **informe de fallos** con el motivo concreto de cada uno |
 | Asignar los exámenes a una carpeta | ✅ | |
 | Actualizar un examen ya importado | 🟡 | Se reemplaza por Id. No conserva los fallos previos de preguntas que coinciden |
 | Crear, renombrar y eliminar carpetas | 🟡 | Crear ✅ · renombrar ⬜ · eliminar ⬜ |
@@ -53,7 +53,7 @@ Leyenda: ✅ implementado · 🟡 parcial · ⬜ pendiente
 | Práctica libre en exámenes sin soluciones | ⬜ | Hoy se usa la primera opción como clave |
 | Guardar y reanudar el progreso | ⬜ | Se guarda el acierto/fallo, no la posición ni la selección actual |
 | Baúl de fallos por carpeta | ✅ | Al acertar, la pregunta deja de figurar como fallo |
-| Limpiar preguntas con Grok | ⬜ | Contradice la regla "sin IA". Habría que decidirlo |
+| Limpiar preguntas con Grok | ❌ | **Descartada por decisión**: la app se mantiene sin IA y sin claves de API |
 
 ---
 
@@ -93,7 +93,9 @@ puede arreglar, y sin clave las claves incorrectas no se pueden corregir.
 
 ### 3. Importación múltiple con informe de fallos
 
-Hoy hay que importar de uno en uno, y un PDF que falla no se distingue de uno que no tiene preguntas.
+~~Pendiente~~ ✅ **Hecho**: se selectionan varios PDFs de golpe y al final aparece un informe
+con los importados (y cuántas preguntas) y los fallidos (con el motivo exacto). Un archivo
+que falla no detiene el resto.
 
 ### 4. Renombrar / eliminar carpetas y exámenes
 

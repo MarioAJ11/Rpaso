@@ -13,16 +13,16 @@ public sealed partial class MainViewModel : ViewModelBase
 {
     private readonly IServicioAlmacenamiento _almacenamiento;
     private readonly IServicioImportacion _importacion;
-    private readonly Func<Task<string?>> _seleccionarPdf;
+    private readonly Func<Task<IReadOnlyList<string>>> _seleccionarPdfs;
 
     public MainViewModel(
         IServicioAlmacenamiento almacenamiento,
         IServicioImportacion importacion,
-        Func<Task<string?>> seleccionarPdf)
+        Func<Task<IReadOnlyList<string>>> seleccionarPdfs)
     {
         _almacenamiento = almacenamiento;
         _importacion = importacion;
-        _seleccionarPdf = seleccionarPdf;
+        _seleccionarPdfs = seleccionarPdfs;
 
         Inicio = new HomeViewModel(this);
         VistaActual = Inicio;
@@ -53,6 +53,14 @@ public sealed partial class MainViewModel : ViewModelBase
 
     [ObservableProperty]
     private string _nuevaCarpetaColorId = "violet";
+
+    /// <summary>Informe de la última importación (null si no se ha importado nada aún).</summary>
+    [ObservableProperty]
+    private InformeImportacionViewModel? _informeImportacion;
+
+    /// <summary>True mientras se muestra el informe de importación.</summary>
+    [ObservableProperty]
+    private bool _mostrarInformeImportacion;
 
     public IReadOnlyList<ColorCarpetaViewModel> Colores { get; } =
         PaletaColores.Todos.Select(c => new ColorCarpetaViewModel(c)).ToList();
@@ -130,26 +138,36 @@ public sealed partial class MainViewModel : ViewModelBase
     [RelayCommand]
     private async Task ImportarPdfAsync()
     {
-        var ruta = await _seleccionarPdf();
+        var rutas = await _seleccionarPdfs();
 
-        if (ruta is null)
+        if (rutas.Count == 0)
             return;
 
-        await ImportarDesdeRutaAsync(ruta);
+        await ImportarVariosAsync(rutas);
     }
 
-    public async Task ImportarDesdeRutaAsync(string ruta)
+    /// <summary>
+    /// Importa varios PDFs. Los que fallan no detienen el resto: al final se muestra
+    /// un informe con lo importado y el motivo de cada fallo.
+    /// </summary>
+    public async Task ImportarVariosAsync(IReadOnlyList<string> rutas)
     {
         try
         {
             Ocupado = true;
-            Estado = "Extrayendo el texto del PDF…";
 
-            var test = await _importacion.ImportarAsync(ruta, CarpetaDestinoId);
+            var progreso = new Progress<string>(archivo => Estado = $"Procesando {archivo}…");
+
+            var informe = await _importacion.ImportarVariosAsync(rutas, CarpetaDestinoId, progreso);
 
             await CargarDatosAsync();
 
-            Estado = $"Importado «{test.Titulo}»: {test.Preguntas.Count} preguntas.";
+            InformeImportacion = new InformeImportacionViewModel(informe, () => MostrarInformeImportacion = false);
+            MostrarInformeImportacion = true;
+
+            Estado = informe.HayFallos
+                ? $"{informe.TotalImportados} importados, {informe.TotalFallidos} con errores."
+                : $"{informe.TotalImportados} exámenes importados.";
         }
         catch (Exception ex)
         {
