@@ -55,6 +55,10 @@ public sealed class HomeViewModel : ViewModelBase
 
     public IRelayCommand AbrirModalCarpetaCommand => _principal.AbrirModalCarpetaCommand;
 
+    public IRelayCommand RenombrarCarpetaCommand => _principal.RenombrarCarpetaCommand;
+
+    public IRelayCommand EliminarCarpetaCommand => _principal.EliminarCarpetaCommand;
+
     public IRelayCommand PracticarCarpetaCommand => _principal.PracticarCarpetaCommand;
 
     public IRelayCommand PracticarCarpetaFalladasCommand => _principal.PracticarCarpetaFalladasCommand;

@@ -1,4 +1,5 @@
 using System.Globalization;
+using CommunityToolkit.Mvvm.ComponentModel;
 using Rpaso.Models;
 
 namespace Rpaso.ViewModels;
@@ -6,13 +7,17 @@ namespace Rpaso.ViewModels;
 /// <summary>
 /// Presentación de un test importado desde un PDF.
 /// </summary>
-public sealed class TestViewModel : ViewModelBase
+public sealed partial class TestViewModel : ViewModelBase
 {
     public TestViewModel(Test test, IReadOnlyDictionary<string, ProgresoPregunta> progreso)
     {
         Test = test;
         Preguntas = test.Preguntas.Select(p => new PreguntaViewModel(p, progreso)).ToList();
     }
+
+    /// <summary>Marcado para la práctica combinada.</summary>
+    [ObservableProperty]
+    private bool _seleccionada;
 
     public Test Test { get; }
 

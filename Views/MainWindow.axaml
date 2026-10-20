@@ -1,4 +1,4 @@
-<Window xmlns="https://github.com/avaloniaui"
+﻿<Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:Rpaso.ViewModels"
         xmlns:views="using:Rpaso.Views"
@@ -124,12 +124,17 @@
             <Border Grid.Row="1" Background="#77FFFFFF" IsVisible="{Binding Ocupado}">
                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="14">
                     <ProgressBar IsIndeterminate="True" Width="240" />
-                    <TextBlock Text="Procesando con el modelo local…" Classes="tenue" HorizontalAlignment="Center" />
+                    <TextBlock Text="Procesando…" Classes="tenue" HorizontalAlignment="Center" />
                 </StackPanel>
             </Border>
         </Grid>
 
-        <!-- ==================== MODAL: NUEVA CARPETA ==================== -->
+        <!-- ==================== MODAL: INFORME DE IMPORTACIÓN ==================== -->
+        <Border Grid.ColumnSpan="2" Background="#66000000" IsVisible="{Binding MostrarInformeImportacion}">
+            <views:InformeImportacionView DataContext="{Binding InformeImportacion}" />
+        </Border>
+
+        <!-- ==================== MODAL GENÉRICO (renombrar / confirmar / crear) ==================== -->
         <Border Grid.ColumnSpan="2" Background="#66000000" IsVisible="{Binding ModalVisible}">
             <Border Background="{StaticResource BrushSuperficie}"
                     BorderBrush="{StaticResource BrushBorde}" BorderThickness="1"
@@ -139,19 +144,16 @@
                     HorizontalAlignment="Center"
                     VerticalAlignment="Center">
                 <StackPanel Spacing="18">
-                    <TextBlock Text="Crear nueva carpeta" Classes="subtitulo" />
+                    <TextBlock Text="{Binding ModalTitulo}" Classes="subtitulo" />
+                    <TextBlock Text="{Binding ModalDescripcion}" Classes="tenue" TextWrapping="Wrap" />
 
-                    <StackPanel Spacing="7">
-                        <TextBlock Text="NOMBRE DE LA CARPETA" Classes="etiqueta" />
-                        <TextBox Text="{Binding NuevaCarpetaNombre}" PlaceholderText="Ej: Bases de Datos y SQL" />
+                    <StackPanel Spacing="7" IsVisible="{Binding ModalMostrarEntrada}">
+                        <TextBox Text="{Binding ModalValor}" PlaceholderText="Escribe aquí" />
+                        <TextBox Text="{Binding ModalDescripcionCarpeta}" PlaceholderText="Descripción (opcional)"
+                                 IsVisible="{Binding ModalMostrarColores}" />
                     </StackPanel>
 
-                    <StackPanel Spacing="7">
-                        <TextBlock Text="DESCRIPCIÓN (OPCIONAL)" Classes="etiqueta" />
-                        <TextBox Text="{Binding NuevaCarpetaDescripcion}" PlaceholderText="Ej: Temas 1 al 4" />
-                    </StackPanel>
-
-                    <StackPanel Spacing="9">
+                    <StackPanel Spacing="9" IsVisible="{Binding ModalMostrarColores}">
                         <TextBlock Text="COLOR IDENTIFICATIVO" Classes="etiqueta" />
                         <ItemsControl ItemsSource="{Binding Colores}">
                             <ItemsControl.ItemsPanel>
@@ -161,33 +163,29 @@
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="vm:ColorCarpetaViewModel">
-                                    <Button Width="56" Height="42" Margin="0,0,8,8"
-                                            Background="{Binding Fondo}"
-                                            BorderBrush="{Binding Borde}"
-                                            BorderThickness="2"
-                                            CornerRadius="12"
+                                    <Button Width="46" Height="36" Margin="0,0,8,8"
+                                            Background="{Binding Fondo}" BorderBrush="{Binding Borde}"
+                                            BorderThickness="2" CornerRadius="10"
                                             Classes.seleccionado="{Binding Seleccionado}"
-                                            Command="{Binding $parent[ItemsControl].((vm:MainViewModel)DataContext).SeleccionarColorCommand}"
+                                            Command="{Binding $parent[ItemsControl].((vm:MainViewModel)DataContext).SeleccionarColorModalCommand}"
                                             CommandParameter="{Binding Id}"
                                             ToolTip.Tip="{Binding Nombre}">
-                                        <Ellipse Width="14" Height="14" Fill="{Binding Icono}" />
+                                        <Ellipse Width="13" Height="13" Fill="{Binding Icono}" />
                                     </Button>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
                     </StackPanel>
 
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10" Margin="0,6,0,0">
-                        <Button Content="Cancelar" Command="{Binding CerrarModalCarpetaCommand}" />
-                        <Button Content="Crear carpeta" Classes="primario" Command="{Binding CrearCarpetaCommand}" />
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
+                        <Button Content="Cancelar" Command="{Binding CerrarModalCommand}" />
+                        <Button Classes="primario" Classes.destructivo="{Binding ModalEsPeligroso}"
+                                Command="{Binding AceptarModalCommand}">
+                            <TextBlock Text="{Binding ModalTextoBoton}" Foreground="White" FontWeight="Bold" />
+                        </Button>
                     </StackPanel>
                 </StackPanel>
             </Border>
-        </Border>
-
-        <!-- ==================== MODAL: INFORME DE IMPORTACIÓN ==================== -->
-        <Border Grid.ColumnSpan="2" Background="#66000000" IsVisible="{Binding MostrarInformeImportacion}">
-            <views:InformeImportacionView DataContext="{Binding InformeImportacion}" />
         </Border>
 
     </Grid>

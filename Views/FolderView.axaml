@@ -84,6 +84,26 @@
                     </StackPanel>
                 </Border>
 
+                <!-- Barra de práctica combinada -->
+                <Border Classes="panel" Padding="14" IsVisible="{Binding Tests.Count}">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                            <Button Classes="fantasma" Padding="8,4" Command="{Binding SeleccionarTodoCommand}">
+                                <TextBlock Text="Seleccionar todo / ninguno" FontSize="12" VerticalAlignment="Center" />
+                            </Button>
+                            <TextBlock Text="{Binding TextoSeleccion}" Classes="micro" VerticalAlignment="Center" />
+                        </StackPanel>
+
+                        <Button Grid.Column="1" Classes="primario" Command="{Binding PracticarSeleccionCommand}"
+                                IsEnabled="{Binding HaySeleccion}">
+                            <StackPanel Orientation="Horizontal" Spacing="7">
+                                <PathIcon Data="M 10,2 L 18,10 L 10,18 L 2,10 Z" Foreground="White" Width="14" Height="14" />
+                                <TextBlock Text="Practicar selección" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                    </Grid>
+                </Border>
+
                 <ItemsControl ItemsSource="{Binding Tests}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
@@ -94,11 +114,19 @@
                         <DataTemplate x:DataType="vm:TestViewModel">
                             <Border Classes="panel" Width="520" Margin="0,0,18,18" Padding="18">
                                 <StackPanel Spacing="12">
-                                    <Border Width="34" Height="34" CornerRadius="9"
-                                            Background="{StaticResource BrushErrorSuave}" HorizontalAlignment="Left">
-                                        <PathIcon Data="M 4,2 L 11,2 L 15,6 L 15,18 L 4,18 Z"
-                                                  Foreground="{StaticResource BrushError}" Width="17" Height="17" />
-                                    </Border>
+                                    <Grid ColumnDefinitions="Auto,*">
+                                        <ToggleButton Grid.Column="0" Classes="casilla"
+                                                      IsChecked="{Binding Seleccionada, Mode=TwoWay}"
+                                                      VerticalAlignment="Center" Margin="0,0,12,0"
+                                                      ToolTip.Tip="Seleccionar para una práctica combinada">
+                                            <PathIcon Data="M 3,8 L 6,11 L 13,4" Width="13" Height="13" />
+                                        </ToggleButton>
+                                        <Border Grid.Column="1" Width="34" Height="34" CornerRadius="9"
+                                                Background="{StaticResource BrushErrorSuave}" HorizontalAlignment="Left">
+                                            <PathIcon Data="M 4,2 L 11,2 L 15,6 L 15,18 L 4,18 Z"
+                                                      Foreground="{StaticResource BrushError}" Width="17" Height="17" />
+                                        </Border>
+                                    </Grid>
 
                                     <TextBlock Text="{Binding Titulo}" FontWeight="Bold" FontSize="15"
                                                TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Titulo}" />
@@ -125,16 +153,40 @@
                                                 Content="Practicar" />
                                     </Grid>
 
-                                    <Button Classes="fantasma" HorizontalAlignment="Left" Padding="0,6"
-                                            Command="{Binding $parent[ItemsControl].((vm:FolderViewModel)DataContext).AbrirEditorCommand}"
-                                            CommandParameter="{Binding}">
-                                        <StackPanel Orientation="Horizontal" Spacing="6">
-                                            <PathIcon Data="M 11,1 L 15,1 L 15,15 L 11,15 Z M 4,4 L 8,4 L 8,8 L 4,8 Z M 4,10 L 8,10 L 8,14 L 4,14 Z"
-                                                      Foreground="{StaticResource BrushPrimario}" Width="13" Height="13" />
-                                            <TextBlock Text="Editar preguntas" FontSize="12" FontWeight="SemiBold"
-                                                       Foreground="{StaticResource BrushPrimario}" />
-                                        </StackPanel>
-                                    </Button>
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <Button Classes="fantasma" Padding="0,6"
+                                                Command="{Binding $parent[ItemsControl].((vm:FolderViewModel)DataContext).AbrirEditorCommand}"
+                                                CommandParameter="{Binding}">
+                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                <PathIcon Data="M 11,1 L 15,1 L 15,15 L 11,15 Z M 4,4 L 8,4 L 8,8 L 4,8 Z M 4,10 L 8,10 L 8,14 L 4,14 Z"
+                                                          Foreground="{StaticResource BrushPrimario}" Width="13" Height="13" />
+                                                <TextBlock Text="Editar" FontSize="12" FontWeight="SemiBold"
+                                                           Foreground="{StaticResource BrushPrimario}" />
+                                            </StackPanel>
+                                        </Button>
+
+                                        <Button Classes="fantasma" Padding="0,6"
+                                                Command="{Binding $parent[ItemsControl].((vm:FolderViewModel)DataContext).RenombrarTestCommand}"
+                                                CommandParameter="{Binding}">
+                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                <PathIcon Data="M 12,2 L 16,6 L 6,16 L 2,17 L 3,13 Z"
+                                                          Foreground="{StaticResource BrushPrimario}" Width="13" Height="13" />
+                                                <TextBlock Text="Renombrar" FontSize="12" FontWeight="SemiBold"
+                                                           Foreground="{StaticResource BrushPrimario}" />
+                                            </StackPanel>
+                                        </Button>
+
+                                        <Button Classes="fantasma" Padding="0,6"
+                                                Command="{Binding $parent[ItemsControl].((vm:FolderViewModel)DataContext).EliminarTestCommand}"
+                                                CommandParameter="{Binding}">
+                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                <PathIcon Data="M 5,5 L 7,5 L 10,8 L 13,5 L 15,5 L 11,10 L 15,15 L 13,15 L 10,12 L 7,15 L 5,15 L 9,10 Z"
+                                                          Foreground="{StaticResource BrushError}" Width="13" Height="13" />
+                                                <TextBlock Text="Eliminar" FontSize="12" FontWeight="SemiBold"
+                                                           Foreground="{StaticResource BrushError}" />
+                                            </StackPanel>
+                                        </Button>
+                                    </StackPanel>
                                 </StackPanel>
                             </Border>
                         </DataTemplate>

@@ -59,8 +59,8 @@ dotnet run -- --geometria "C:\ruta\a\tu\examen.pdf" 2
 dotnet run -- --analizar "C:\ruta\a\tu\examen.pdf" 2
 ```
 
-> Si `--texto` dice "Páginas con texto: 0", el PDF es un **escaneo sin capa de texto**:
-> la app no puede leerlo (haría falta OCR).
+> Si `--texto` dice "Páginas con texto: 0", el PDF es un **escaneo sin capa de texto**: la app lo
+> procesa igualmente con el OCR nativo de Windows (ver la sección de OCR).
 
 ### Publicar (ejecutable autocontenido)
 
@@ -203,16 +203,34 @@ da el ~80% y el editor lo deja limpio.
 
 ## Editor de preguntas
 
-Desde cualquier carpeta, botón **"Editar preguntas"** sobre un test:
+Desde cualquier carpeta, botón **"Editar"** sobre un test:
 
 - Editar el **título** del examen.
 - Editar **enunciados** y **opciones**.
-- Marcar la **respuesta correcta** con el radio button.
+- Marcar la **respuesta correcta** con el radio.
 - **Añadir / eliminar** opciones y preguntas.
 - Las letras (a, b, c…) se **renumeran** solas al añadir o quitar.
 
 Es imprescindible porque 4 de tus PDFs no marcan la respuesta: sin editor, la clave cae en la
 primera opción.
+
+---
+
+## Gestión de la biblioteca
+
+Sobre cada **carpeta** de la pantalla de inicio hay dos botones: lápiz (renombrar) y aspa (eliminar).
+Sobre cada **examen**, dentro de la carpeta, hay tres: *Editar*, *Renombrar* y *Eliminar*.
+
+- **Renombrar** y **eliminar** usan un modal genérico con confirmación; el botón de eliminar se
+  pinta en rojo.
+- Al **eliminar una carpeta** sus exámenes **no se borran**: se quedan "sin carpeta".
+- Cada tarjeta de examen tiene una **casilla** para marcarlo. Con dos o más marcados, la barra
+  superior ofrece **"Practicar selección"**: una sola práctica con las preguntas de todos ellos
+  mezcladas (útil para repasar un mismo tema repartido en varios PDFs).
+- **"Seleccionar todo / ninguno"** marca o desmarca la carpeta entera de una vez.
+
+Las acciones se aplican al instante sobre la vista abierta: la tarjeta se actualiza sin
+recargar la aplicación.
 
 ---
 
@@ -232,14 +250,19 @@ Rpaso/
 │   ├── IServicioExtraccionPdf.cs   Lectura del PDF con PdfPig
 │   ├── IServicioImportacion.cs     Caso de uso: PDF → test guardado
 │   ├── IServicioParserExamen.cs    Contrato del parser geométrico
+│   ├── IServicioOcrWindows.cs      Contrato del OCR nativo de Windows
+│   ├── PalabraTexto.cs             Abstracción palabra + coordenadas (PDF u OCR)
 │   ├── ServicioAlmacenamiento.cs
 │   ├── ServicioExtraccionPdf.cs
+│   ├── ServicioOcrWindows.cs       ⭐ OCR con Windows.Media.Ocr
 │   └── ServicioParserExamen.cs     ⭐ el parser geométrico
 ├── ViewModels/                 Presentación y estado (CommunityToolkit.Mvvm)
 ├── Views/                      XAML
-│   ├── MainWindow.axaml        Shell: barra lateral + cabecera + contenido + modal
+│   ├── MainWindow.axaml        Shell: barra lateral + cabecera + contenido + modales
 │   ├── HomeView.axaml          Inicio: métricas y carpetas
 │   ├── FolderView.axaml        Carpetas: PDFs y acciones de práctica
+│   ├── EditorTestView.axaml    Editor de preguntas
+│   ├── InformeImportacionView.axaml  Informe de la importación (importados y fallos)
 │   └── QuizView.axaml          Modo examen
 ├── Assets/Estilos/
 │   ├── Tema.axaml              Paleta (recursos)
@@ -279,21 +302,35 @@ Por eso las vistas **deben** llamarse `XxxView` (no `XxxWindow`): el `ViewLocato
   `ResourceDictionary.MergedDictionaries`.
 - **Windows Defender Application Control (WDAC)** de algunas empresas bloquea binarios gestionados sin
   firmar. Si el ejecutable no arranca, mira el log `Microsoft-Windows-CodeIntegrity/Operational`.
+- **Un `Button` dentro de otro `Button` no funciona**: el clic lo captura el padre. Los botones de
+  acción de una tarjeta que es un botón van en una **capa superpuesta** (`Grid` con el botón de la
+  tarjeta y un `StackPanel` encima).
+- **El `ViewLocator` sustituye `"ViewModel"` por `"View"` en el nombre completo del tipo**, así que
+  `Rpaso.ViewModels.EditorTestViewModel` busca `Rpaso.Views.EditorTestView`. Si la vista se llama de
+  otra forma, se muestra el nombre de la clase en vez de la interfaz.
+- **Los controles del tema Fluent se cebillan con su propio color**: el `CheckBox` sale invisible y el
+  `RadioButton` marcado sale rojo (el acento del sistema). Por eso la casilla de selección es un
+  `ToggleButton` propio (`Classes="casilla"`) y la respuesta correcta un `Button` con un círculo
+  interior.
 
 ### Depuración
 
 `RPASO_DEBUG_JSON=1` ya no aplica (no hay IA).
 
-`RPASO_TEST_VISTA=carpeta|quiz|quiz-corregido` arranca directamente en una vista concreta (solo depuración).
+`RPASO_TEST_VISTA=carpeta|quiz|quiz-corregido|informe|editor` arranca directamente en una vista
+concreta (solo depuración). `RPASO_TEST_PDFS=a.pdf;b.pdf` indica los archivos a importar en el
+modo `informe`.
 
 ---
 
 ## Límites conocidos
 
-- **PDF escaneados**: sin capa de texto → 0 preguntas. Haría falta OCR.
 - **PDF a dos columnas**: el parser asume una sola columna de texto. En un PDF a dos columnas las líneas
   se mezclarían.
 - **Claves de respuesta**: si el PDF no incluye la clave, se usa la primera opción. Si el examen es del
   tipo *"señalale la respuesta incorrecta"*, la clave que trae el examen es la opción **incorrecta**, y así
   se guarda.
 - **Exámenes sin numerar**: si no hay clave numerada, no se puede emparejar la clave con la pregunta.
+- **OCR**: los escaneos dependen del paquete de idioma español de Windows y arrastran errores típicos
+  de reconocimiento (`l`/`I`, `rn`/`m`); el editor de preguntas es la red de seguridad.
+- **Solo Windows**: el OCR de Windows obliga a compilar para `net10.0-windows10.0.19041.0`.

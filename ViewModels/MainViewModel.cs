@@ -42,18 +42,6 @@ public sealed partial class MainViewModel : ViewModelBase
     [ObservableProperty]
     private string _estado = string.Empty;
 
-    [ObservableProperty]
-    private bool _modalVisible;
-
-    [ObservableProperty]
-    private string _nuevaCarpetaNombre = string.Empty;
-
-    [ObservableProperty]
-    private string _nuevaCarpetaDescripcion = string.Empty;
-
-    [ObservableProperty]
-    private string _nuevaCarpetaColorId = "violet";
-
     /// <summary>Informe de la última importación (null si no se ha importado nada aún).</summary>
     [ObservableProperty]
     private InformeImportacionViewModel? _informeImportacion;
@@ -90,7 +78,7 @@ public sealed partial class MainViewModel : ViewModelBase
     /// <summary>True si la vista activa es el inicio (resalta el botón de la barra lateral).</summary>
     public bool EsVistaInicio => VistaActual is HomeViewModel;
 
-    partial void OnNuevaCarpetaColorIdChanged(string value)
+    partial void OnModalColorIdChanged(string value)
     {
         foreach (var color in Colores)
             color.Seleccionado = color.Id == value;
@@ -100,7 +88,7 @@ public sealed partial class MainViewModel : ViewModelBase
     private void SeleccionarColor(string? colorId)
     {
         if (!string.IsNullOrWhiteSpace(colorId))
-            NuevaCarpetaColorId = colorId;
+            ModalColorId = colorId;
     }
 
     /// <summary>Carga carpetas, tests y progreso desde el disco.</summary>
@@ -113,14 +101,34 @@ public sealed partial class MainViewModel : ViewModelBase
         foreach (var registro in await _almacenamiento.CargarProgresoAsync())
             progreso[registro.PreguntaId] = registro;
 
+        // Si hay una carpeta abierta, se recuerda qué tests estaban marcados.
+        var idsSeleccionados = (VistaActual as FolderViewModel)?.IdsSeleccionados;
+
+        // Se reaprovechan las instancias existentes: las vistas abiertas siguen
+        // apuntando a la misma carpeta y así se refrescan al renombrar o eliminar.
+        var existentes = Carpetas.ToDictionary(c => c.Id, StringComparer.OrdinalIgnoreCase);
+
         Carpetas.Clear();
         foreach (var carpeta in carpetas)
-            Carpetas.Add(new CarpetaViewModel(carpeta, tests, progreso));
+        {
+            if (existentes.TryGetValue(carpeta.Id, out var vista))
+            {
+                vista.Actualizar(carpeta, tests, progreso);
+                Carpetas.Add(vista);
+            }
+            else
+            {
+                Carpetas.Add(new CarpetaViewModel(carpeta, tests, progreso));
+            }
+        }
 
         OnPropertyChanged(nameof(Carpetas));
         OnPropertyChanged(nameof(TotalTests));
         OnPropertyChanged(nameof(TotalPreguntas));
         OnPropertyChanged(nameof(TotalFalladas));
+
+        if (VistaActual is FolderViewModel carpetaAbierta)
+            carpetaAbierta.Refrescar(idsSeleccionados);
     }
 
     [RelayCommand]
@@ -204,6 +212,179 @@ public sealed partial class MainViewModel : ViewModelBase
         Estado = $"Guardado «{test.Titulo}».";
     }
 
+    // ─────────────── Modal genérico (renombrar / confirmar) ───────────────
+
+    [ObservableProperty] private bool _modalVisible;
+    [ObservableProperty] private string _modalTitulo = string.Empty;
+    [ObservableProperty] private string _modalDescripcion = string.Empty;
+    [ObservableProperty] private string _modalValor = string.Empty;
+    [ObservableProperty] private bool _modalMostrarEntrada;
+    [ObservableProperty] private bool _modalEsPeligroso;
+    [ObservableProperty] private bool _modalMostrarColores;
+    [ObservableProperty] private string _modalTextoBoton = "Aceptar";
+    [ObservableProperty] private string _modalColorId = "violet";
+    [ObservableProperty] private string _modalDescripcionCarpeta = string.Empty;
+
+    private Func<Task>? _modalAccion;
+
+    [RelayCommand]
+    private void CerrarModal()
+    {
+        ModalVisible = false;
+        _modalAccion = null;
+    }
+
+    [RelayCommand]
+    private async Task AceptarModalAsync()
+    {
+        var accion = _modalAccion;
+        _modalAccion = null;
+        ModalVisible = false;
+
+        if (accion is not null)
+            await accion();
+    }
+
+    private void AbrirModal(
+        string titulo, string descripcion, string valor,
+        bool mostrarEntrada, bool peligroso, Func<Task> accion,
+        string textoBoton = "Aceptar", bool mostrarColores = false)
+    {
+        ModalTitulo = titulo;
+        ModalDescripcion = descripcion;
+        ModalValor = valor;
+        ModalMostrarEntrada = mostrarEntrada;
+        ModalEsPeligroso = peligroso;
+        ModalTextoBoton = textoBoton;
+        ModalMostrarColores = mostrarColores;
+        ModalColorId = "violet";
+        _modalAccion = accion;
+        ModalVisible = true;
+    }
+
+    private async Task CrearCarpeta()
+    {
+        var nombre = ModalValor.Trim();
+
+        if (nombre.Length == 0)
+            return;
+
+        var carpeta = new Carpeta(
+            Id: $"c-{Guid.NewGuid():N}"[..10],
+            Nombre: nombre,
+            Descripcion: ModalDescripcionCarpeta.Trim(),
+            ColorId: ModalColorId);
+
+        await _almacenamiento.GuardarCarpetaAsync(carpeta);
+
+        Carpetas.Add(new CarpetaViewModel(carpeta, [], new Dictionary<string, ProgresoPregunta>()));
+
+        OnPropertyChanged(nameof(TotalTests));
+        OnPropertyChanged(nameof(TotalPreguntas));
+        OnPropertyChanged(nameof(TotalFalladas));
+
+        Estado = $"Carpeta «{nombre}» creada.";
+    }
+
+    // ─────────────── Carpetas ───────────────
+
+    [RelayCommand]
+    private void RenombrarCarpeta(CarpetaViewModel? carpeta)
+    {
+        if (carpeta is null)
+            return;
+
+        var original = carpeta.Carpeta;
+
+        AbrirModal("Renombrar carpeta", "Escribe el nuevo nombre.", carpeta.Nombre, true, false, async () =>
+        {
+            var nombre = ModalValor.Trim();
+
+            if (nombre.Length == 0 || nombre == original.Nombre)
+                return;
+
+            await _almacenamiento.GuardarCarpetaAsync(original with { Nombre = nombre });
+            await CargarDatosAsync();
+            Estado = $"Carpeta renombrada a «{nombre}».";
+        });
+    }
+
+    [RelayCommand]
+    private void EliminarCarpeta(CarpetaViewModel? carpeta)
+    {
+        if (carpeta is null)
+            return;
+
+        var id = carpeta.Id;
+
+        AbrirModal(
+            "Eliminar carpeta",
+            $"Se eliminará «{carpeta.Nombre}». Los exámenes que tenía se quedarán sin carpeta (no se borran).",
+            string.Empty, false, true, async () =>
+            {
+                await _almacenamiento.EliminarCarpetaAsync(id);
+                await CargarDatosAsync();
+                Estado = "Carpeta eliminada.";
+            },
+            textoBoton: "Eliminar");
+    }
+
+    // ─────────────── Exámenes ───────────────
+
+    [RelayCommand]
+    private void RenombrarTest(TestViewModel? test)
+    {
+        if (test is null)
+            return;
+
+        var original = test.Test;
+
+        AbrirModal("Renombrar examen", "Escribe el nuevo nombre.", test.Titulo, true, false, async () =>
+        {
+            var titulo = ModalValor.Trim();
+
+            if (titulo.Length == 0 || titulo == original.Titulo)
+                return;
+
+            await _almacenamiento.GuardarTestAsync(original with { Titulo = titulo });
+            await CargarDatosAsync();
+            Estado = $"Examen renombrado a «{titulo}».";
+        });
+    }
+
+    [RelayCommand]
+    private void EliminarTest(TestViewModel? test)
+    {
+        if (test is null)
+            return;
+
+        var id = test.Id;
+
+        AbrirModal(
+            "Eliminar examen",
+            $"Se eliminará «{test.Titulo}» y su progreso. No se puede deshacer.",
+            string.Empty, false, true, async () =>
+            {
+                await _almacenamiento.EliminarTestAsync(id);
+                await CargarDatosAsync();
+                Estado = "Examen eliminado.";
+            },
+            textoBoton: "Eliminar");
+    }
+
+    // ─────────────── Práctica combinada ───────────────
+
+    /// <summary>Arranca una práctica con las preguntas de varios exámenes a la vez.</summary>
+    public void PracticarSeleccion(IReadOnlyList<TestViewModel> tests)
+    {
+        var preguntas = tests.SelectMany(t => t.Preguntas).ToList();
+
+        if (preguntas.Count == 0)
+            return;
+
+        VistaActual = CrearQuiz("Práctica combinada", preguntas);
+    }
+
     [RelayCommand]
     private void PracticarTest(TestViewModel? test)
     {
@@ -273,39 +454,23 @@ public sealed partial class MainViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private void AbrirModalCarpeta()
+    private void SeleccionarColorModal(string? colorId)
     {
-        NuevaCarpetaNombre = string.Empty;
-        NuevaCarpetaDescripcion = string.Empty;
-        NuevaCarpetaColorId = "violet";
-        ModalVisible = true;
+        if (!string.IsNullOrWhiteSpace(colorId))
+            ModalColorId = colorId;
     }
 
     [RelayCommand]
-    private void CerrarModalCarpeta() => ModalVisible = false;
-
-    [RelayCommand]
-    private async Task CrearCarpetaAsync()
+    private void AbrirModalCarpeta()
     {
-        var nombre = NuevaCarpetaNombre.Trim();
-
-        if (nombre.Length == 0)
-            return;
-
-        var carpeta = new Carpeta(
-            Id: $"c-{Guid.NewGuid():N}"[..10],
-            Nombre: nombre,
-            Descripcion: NuevaCarpetaDescripcion.Trim(),
-            ColorId: NuevaCarpetaColorId);
-
-        await _almacenamiento.GuardarCarpetaAsync(carpeta);
-
-        Carpetas.Add(new CarpetaViewModel(carpeta, [], new Dictionary<string, ProgresoPregunta>()));
-
-        OnPropertyChanged(nameof(TotalTests));
-        OnPropertyChanged(nameof(TotalPreguntas));
-        OnPropertyChanged(nameof(TotalFalladas));
-
-        ModalVisible = false;
+        AbrirModal(
+            "Nueva carpeta",
+            "Ponle un nombre a la carpeta y elige su color.",
+            string.Empty,
+            true,
+            false,
+            CrearCarpeta,
+            textoBoton: "Crear carpeta",
+            mostrarColores: true);
     }
 }

@@ -1,7 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Rpaso.ViewModels"
-             x:Class="Rpaso.Views.EditorView"
+             x:Class="Rpaso.Views.EditorTestView"
              x:DataType="vm:EditorTestViewModel">
 
     <Grid RowDefinitions="Auto,*">
@@ -55,12 +55,15 @@
                                             <ItemsControl.ItemTemplate>
                                                 <DataTemplate x:DataType="vm:OpcionEditorViewModel">
                                                     <Grid ColumnDefinitions="Auto,Auto,*,Auto" Margin="0,0,0,6">
-                                                        <RadioButton Grid.Column="0"
-                                                                    IsChecked="{Binding EsCorrecta, Mode=TwoWay}"
-                                                                    GroupName="{Binding $parent[ItemsControl].((vm:PreguntaEditorViewModel)DataContext).Id}"
-                                                                    VerticalAlignment="Center"
-                                                                    Margin="0,0,10,0"
-                                                                    ToolTip.Tip="Marcar como la respuesta correcta" />
+                                                        <Button Grid.Column="0" Classes="radio"
+                                                                Classes.correcta="{Binding EsCorrecta}"
+                                                                Command="{Binding $parent[ItemsControl].((vm:PreguntaEditorViewModel)DataContext).MarcarOpcionComoCorrectaCommand}"
+                                                                CommandParameter="{Binding}"
+                                                                VerticalAlignment="Center"
+                                                                Margin="0,0,10,0"
+                                                                ToolTip.Tip="Marcar como la respuesta correcta">
+                                                            <Ellipse Classes="punto" />
+                                                        </Button>
 
                                                         <Border Grid.Column="1" Width="28" Height="28" CornerRadius="8"
                                                 Background="{StaticResource BrushFondoTenue}" VerticalAlignment="Center">

@@ -2,9 +2,9 @@ using Avalonia.Controls;
 
 namespace Rpaso.Views;
 
-public partial class EditorView : UserControl
+public partial class EditorTestView : UserControl
 {
-    public EditorView()
+    public EditorTestView()
     {
         InitializeComponent();
     }

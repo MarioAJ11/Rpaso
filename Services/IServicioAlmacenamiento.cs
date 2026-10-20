@@ -13,6 +13,12 @@ public interface IServicioAlmacenamiento
     /// <summary>Añade una carpeta o reemplaza la existente con el mismo Id.</summary>
     Task GuardarCarpetaAsync(Carpeta carpeta, CancellationToken ct = default);
 
+    /// <summary>Elimina una carpeta. Los tests que tenía pasan a quedar "sin carpeta".</summary>
+    Task EliminarCarpetaAsync(string carpetaId, CancellationToken ct = default);
+
+    /// <summary>Elimina un test.</summary>
+    Task EliminarTestAsync(string testId, CancellationToken ct = default);
+
     /// <summary>Carga todos los tests importados. Devuelve lista vacía si no hay datos.</summary>
     Task<IReadOnlyList<Test>> CargarTestsAsync(CancellationToken ct = default);
 

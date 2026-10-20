@@ -70,6 +70,15 @@ public sealed partial class PreguntaEditorViewModel : ViewModelBase
     }
 
     [RelayCommand]
+    private void MarcarOpcionComoCorrecta(OpcionEditorViewModel? opcion)
+    {
+        if (opcion is null)
+            return;
+
+        opcion.EsCorrecta = true;
+    }
+
+    [RelayCommand]
     private void AñadirOpcion()
     {
         Opciones.Add(new OpcionEditorViewModel("", "", false, MarcarComoCorrecta));

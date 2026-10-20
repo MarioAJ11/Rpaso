@@ -55,8 +55,19 @@ public sealed class ServicioAlmacenamiento : IServicioAlmacenamiento
         await EscribirAsync(FicheroCarpetas, carpetas, ct);
     }
 
-    public async Task<IReadOnlyList<Test>> CargarTestsAsync(CancellationToken ct = default)
-        => await LeerAsync<List<Test>>(FicheroTests, ct) ?? [];
+    public async Task EliminarCarpetaAsync(string carpetaId, CancellationToken ct = default)
+    {
+        var carpetas = (await CargarCarpetasAsync(ct)).Where(c => c.Id != carpetaId).ToList();
+        await EscribirAsync(FicheroCarpetas, carpetas, ct);
+    }
+
+    public async Task EliminarTestAsync(string testId, CancellationToken ct = default)
+    {
+        var tests = (await CargarTestsAsync(ct)).Where(t => t.Id != testId).ToList();
+        await EscribirAsync(FicheroTests, tests, ct);
+    }
+
+    public async Task<IReadOnlyList<Test>> CargarTestsAsync(CancellationToken ct = default)        => await LeerAsync<List<Test>>(FicheroTests, ct) ?? [];
 
     public async Task GuardarTestAsync(Test test, CancellationToken ct = default)
     {

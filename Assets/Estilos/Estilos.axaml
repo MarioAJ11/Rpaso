@@ -240,5 +240,72 @@
         <Setter Property="BorderThickness" Value="3" />
     </Style>
 
+    <!-- Casilla de selección: se define aquí porque el CheckBox del tema Fluent no se ve. -->
+    <Style Selector="ToggleButton.casilla">
+        <Setter Property="Width" Value="24" />
+        <Setter Property="Height" Value="24" />
+        <Setter Property="CornerRadius" Value="7" />
+        <Setter Property="Background" Value="{StaticResource BrushSuperficie}" />
+        <Setter Property="BorderBrush" Value="{StaticResource BrushBorde}" />
+        <Setter Property="BorderThickness" Value="1.5" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="Cursor" Value="Hand" />
+    </Style>
+
+    <Style Selector="ToggleButton.casilla:checked">
+        <Setter Property="Background" Value="{StaticResource BrushPrimario}" />
+        <Setter Property="BorderBrush" Value="{StaticResource BrushPrimario}" />
+    </Style>
+
+    <Style Selector="ToggleButton.casilla PathIcon">
+        <Setter Property="IsVisible" Value="False" />
+    </Style>
+
+    <Style Selector="ToggleButton.casilla:checked PathIcon">
+        <Setter Property="IsVisible" Value="True" />
+        <Setter Property="Foreground" Value="White" />
+    </Style>
+
+    <!-- Acción destructiva (eliminar): el botón principal se pinta en rojo. -->
+    <Style Selector="Button.primario.destructivo">
+        <Setter Property="Background" Value="{StaticResource BrushError}" />
+        <Setter Property="Foreground" Value="White" />
+    </Style>
+
+    <Style Selector="Button.primario.destructivo /template/ ContentPresenter">
+        <Setter Property="Background" Value="{StaticResource BrushError}" />
+    </Style>
+
+    <Style Selector="Button.primario.destructivo:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="{StaticResource BrushError}" />
+    </Style>
+
+    <!-- Radio de "respuesta correcta": se define aquí para que use el violeta de la app. -->
+    <Style Selector="Button.radio">
+        <Setter Property="Width" Value="20" />
+        <Setter Property="Height" Value="20" />
+        <Setter Property="CornerRadius" Value="10" />
+        <Setter Property="Background" Value="{StaticResource BrushSuperficie}" />
+        <Setter Property="BorderBrush" Value="{StaticResource BrushBorde}" />
+        <Setter Property="BorderThickness" Value="2" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="Cursor" Value="Hand" />
+    </Style>
+
+    <Style Selector="Button.radio Ellipse.punto">
+        <Setter Property="Width" Value="10" />
+        <Setter Property="Height" Value="10" />
+        <Setter Property="Fill" Value="Transparent" />
+    </Style>
+
+    <Style Selector="Button.radio.correcta Ellipse.punto">
+        <Setter Property="Fill" Value="{StaticResource BrushPrimario}" />
+    </Style>
+
+    <Style Selector="Button.radio.correcta">
+        <Setter Property="BorderBrush" Value="{StaticResource BrushPrimario}" />
+        <Setter Property="BorderThickness" Value="2" />
+    </Style>
+
 </Styles>
 
