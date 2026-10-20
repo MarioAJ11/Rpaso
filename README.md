@@ -188,6 +188,34 @@ Por orden de fiabilidad:
 
 ---
 
+## OCR (PDF escaneados)
+
+Los PDF de móvil escaneados no tienen capa de texto. La app los lee con **OCR nativo de Windows**
+(`Windows.Data.Pdf` para renderizar + `Windows.Media.Ocr` para reconocer): **0 MB extra** de ejecutable.
+
+> Requiere el **paquete de idioma español** de Windows (Configuración → Hora e idioma → Idioma y región).
+> Sin él el OCR no está disponible y la app indica el motivo exacto.
+
+El OCR mete errores típicos (`l`/`I`, `rn`/`m`). Para eso está el **editor de preguntas**: el OCR te
+da el ~80% y el editor lo deja limpio.
+
+---
+
+## Editor de preguntas
+
+Desde cualquier carpeta, botón **"Editar preguntas"** sobre un test:
+
+- Editar el **título** del examen.
+- Editar **enunciados** y **opciones**.
+- Marcar la **respuesta correcta** con el radio button.
+- **Añadir / eliminar** opciones y preguntas.
+- Las letras (a, b, c…) se **renumeran** solas al añadir o quitar.
+
+Es imprescindible porque 4 de tus PDFs no marcan la respuesta: sin editor, la clave cae en la
+primera opción.
+
+---
+
 ## Estructura del proyecto
 
 ```
