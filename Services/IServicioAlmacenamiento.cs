@@ -7,10 +7,16 @@ namespace Rpaso.Services;
 /// </summary>
 public interface IServicioAlmacenamiento
 {
+    /// <summary>Carga las carpetas temáticas. Devuelve lista vacía si no hay datos.</summary>
+    Task<IReadOnlyList<Carpeta>> CargarCarpetasAsync(CancellationToken ct = default);
+
+    /// <summary>Añade una carpeta o reemplaza la existente con el mismo Id.</summary>
+    Task GuardarCarpetaAsync(Carpeta carpeta, CancellationToken ct = default);
+
     /// <summary>Carga todos los tests importados. Devuelve lista vacía si no hay datos.</summary>
     Task<IReadOnlyList<Test>> CargarTestsAsync(CancellationToken ct = default);
 
-    /// <summary>Añade un test o lo reemplaza si ya existe uno con el mismo Id.</summary>
+    /// <summary>Añade un test o reemplaza el existente con el mismo Id.</summary>
     Task GuardarTestAsync(Test test, CancellationToken ct = default);
 
     /// <summary>Carga el progreso del usuario sobre las preguntas ya respondidas.</summary>

@@ -9,6 +9,7 @@ namespace Rpaso.Services;
 /// </summary>
 public sealed class ServicioAlmacenamiento : IServicioAlmacenamiento
 {
+    private const string FicheroCarpetas = "carpetas.json";
     private const string FicheroTests = "tests.json";
     private const string FicheroProgreso = "progreso.json";
 
@@ -36,6 +37,22 @@ public sealed class ServicioAlmacenamiento : IServicioAlmacenamiento
             "Rpaso");
 
         Directory.CreateDirectory(_directorio);
+    }
+
+    public async Task<IReadOnlyList<Carpeta>> CargarCarpetasAsync(CancellationToken ct = default)
+        => await LeerAsync<List<Carpeta>>(FicheroCarpetas, ct) ?? [];
+
+    public async Task GuardarCarpetaAsync(Carpeta carpeta, CancellationToken ct = default)
+    {
+        var carpetas = (await CargarCarpetasAsync(ct)).ToList();
+        var indice = carpetas.FindIndex(c => c.Id == carpeta.Id);
+
+        if (indice >= 0)
+            carpetas[indice] = carpeta;
+        else
+            carpetas.Add(carpeta);
+
+        await EscribirAsync(FicheroCarpetas, carpetas, ct);
     }
 
     public async Task<IReadOnlyList<Test>> CargarTestsAsync(CancellationToken ct = default)
