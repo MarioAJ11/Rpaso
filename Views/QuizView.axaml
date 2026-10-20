@@ -86,7 +86,7 @@
                                 <TextBlock Text="Respuesta incorrecta" FontWeight="Bold" FontSize="13"
                                            Foreground="{StaticResource BrushError}" />
                                 <TextBlock Classes="micro" TextWrapping="Wrap" Foreground="{StaticResource BrushError}"
-                                           Text="{Binding PreguntaActual.ClaveRespuesta, StringFormat='La opción correcta era la ({0}). Esta pregunta queda marcada para repasarla.'}" />
+                                           Text="{Binding PreguntaActual.ClaveRespuesta, StringFormat='La respuesta era la ({0}). Esta pregunta queda marcada para repasarla.'}" />
                             </StackPanel>
                         </StackPanel>
                     </Border>

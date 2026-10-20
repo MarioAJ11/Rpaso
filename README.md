@@ -1,111 +1,103 @@
 # Repaso
 
 Aplicación de escritorio para **convertir PDFs de exámenes tipo test en tests interactivos** y practicarlos.
-Todo el procesamiento ocurre **en local**: el modelo de lenguaje y la extracción de texto se ejecutan en tu
-propio equipo. No hay cuentas, ni claves de API, ni conexión a internet.
+
+Todo funciona **en local y sin IA**: el análisis del PDF se hace con un **parser geométrico** que trabaja con
+las coordenadas del texto. No hay modelos, ni claves de API, ni conexión a internet, ni ficheros de más de 100 MB.
 
 - **Frontend:** Avalonia UI 12 (XAML)
 - **Lógica:** C# · .NET 10 · MVVM con `CommunityToolkit.Mvvm`
-- **Extracción de texto:** `PdfPig` (paquete NuGet `PdfPig`, namespace `UglyToad.PdfPig`)
-- **Estructuración con IA:** `LLamaSharp` + `llama.cpp` con un modelo **GGUF** local
+- **Extracción:** `PdfPig` (paquete NuGet `PdfPig`, namespace `UglyToad.PdfPig`)
 
 ---
 
 ## Puesta en marcha
 
-### 1. Requisitos
-
-- **.NET 10 SDK** (o superior).
-- Un **modelo GGUF** descargado (ver siguiente punto).
-
-### 2. Descargar el modelo
-
-La aplicación busca el modelo en este orden:
-
-1. Variable de entorno `RPASO_MODELO` (ruta completa a un `.gguf`).
-2. `%APPDATA%\Rpaso\Modelos\*.gguf`.
-3. `Modelos\*.gguf` junto al ejecutable.
-4. `Assets\Modelos\*.gguf` de la raíz del proyecto (desarrollo).
-
-Modelos recomendados:
-
-| Modelo | Tamaño | Calidad |
-| --- | --- | --- |
-| [`Qwen2.5-1.5B-Instruct-GGUF`](https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF) (`q4_k_m`) | 1,06 GB | ✅ **Recomendado** |
-| [`Qwen2.5-0.5B-Instruct-GGUF`](https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF) (`q4_k_m`) | 468 MB | Más rápido, menos exacto con las claves de respuesta |
-
-Descarga directa:
-
-```powershell
-mkdir -Force Assets\Modelos
-Invoke-WebRequest "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf?download=true" -OutFile "Assets\Modelos\qwen2.5-1.5b-instruct-q4_k_m.gguf"
-```
-
-> Si hay varios modelos en la carpeta, la aplicación usa **el más grande**.
-
-### 3. Ejecutar
-
 ```powershell
 dotnet run
 ```
 
-### 4. Verificar el pipeline por consola (sin interfaz)
+Sin más dependencias: no hay modelos que descargar ni que instalar.
+
+### Verificar el pipeline por consola
 
 ```powershell
+# Resultado completo: preguntas, opciones y claves
 dotnet run -- --verificar "C:\ruta\a\tu\examen.pdf"
-```
 
-Imprime las preguntas extraídas y la clave de cada una. Útil para depurar el modelo.
-
-Y si lo que falla es la **extracción** (no el modelo), este modo te enseña el texto tal cual sale del PDF:
-
-```powershell
+# Texto crudo que sale del PDF (para ver si tiene capa de texto)
 dotnet run -- --texto "C:\ruta\a\tu\examen.pdf"
+
+# Geometría: cada palabra con su X y su Y
+dotnet run -- --geometria "C:\ruta\a\tu\examen.pdf" 2
+
+# Cómo clasifica el parser cada línea (enunciado / opción / continuación)
+dotnet run -- --analizar "C:\ruta\a\tu\examen.pdf" 2
 ```
 
-> Si dice "Páginas con texto: 0", el PDF es un **escaneo sin capa de texto**: la app no puede leerlo
-> (haría falta OCR).
+> Si `--texto` dice "Páginas con texto: 0", el PDF es un **escaneo sin capa de texto**:
+> la app no puede leerlo (haría falta OCR).
 
-### 5. Publicar (ejecutable autocontenido)
+### Publicar (ejecutable autocontenido)
 
 ```powershell
 dotnet publish -c Release -r win-x64 --self-contained true -o publicacion
 ```
 
-El resultado incluye `Rpaso.exe`, las bibliotecas nativas de `llama.cpp` y los modelos en `Modelos/`.
 El usuario final solo hace **doble clic** en `Rpaso.exe`: no necesita instalar .NET ni nada más.
-
-> Para distribución, Borra el modelo que no Uses de `Assets\Modelos` antes de publicar: cada modelo
-> añade su tamaño al ejecutable.
 
 ---
 
-## Cómo funciona la importación
+## Cómo funciona el parser geométrico
+
+El problema: los PDFs de descarga (wuolah, campus virtuales) traen **publicidad, avisos legales, marcas de
+agua y portadas** mezclados con las preguntas. Un parser de texto plano se los come.
+
+La solución: **trabajar con las coordenadas**, no con la cadena de texto.
 
 ```
-PDF  ──►  PdfPig (texto por página)  ──►  troceado por contexto  ──►  modelo GGUF local
-                                                                      │
-                          Modelos/ViewModels/Views  ◄──  JSON estricto ◄┘
+PDF
+ │
+ ├─ 1) Descartar los márgenes por coordenada Y
+ │     La Y de PDF crece hacia arriba: el pie de página son las Y pequeñas.
+ │     Se tira todo lo que esté por debajo del 5,5% inferior y por encima del 4,5% superior.
+ │
+ ├─ 2) Reconstruir las líneas agrupando por línea base
+ │     Cada palabra tiene una Y base. Las palabras con la misma Y base son la misma línea.
+ │     Se unen respetando los huecos horizontales (una columna a la izquierda y otra a la
+ │     derecha NO son la misma frase).
+ │
+ ├─ 3) Clasificar cada línea
+ │     • "a)", "b." …            → opción (etiqueta explícita)
+ │     • sangrada respecto a X   → opción sin letra (los exams de Kansei no las traen)
+ │     • termina en . ? ! :      → la frase está completa, lo siguiente es otra cosa
+ │     • en la misma columna y con salto vertical pequeño → continuación de la anterior
+ │     • resto                   → enunciado
+ │
+ └─ 4) Ensamblar preguntas y aplicar la clave de respuestas
 ```
 
-1. **PdfPig** extrae el texto de cada página conservando los saltos de línea (son la frontera entre
-   enunciado y opciones).
-2. El texto se **trocea** en fragmentos que caben en el contexto del modelo, sin partir preguntas.
-3. Cada fragmento se envía al modelo local con una **gramática GBNF** que obliga a emitir exactamente
-   este JSON, token a token:
+### Las señales geométricas que se usan
 
-   ```json
-   {"preguntas":[{"enunciado":"...","opciones":[{"id":"a","texto":"..."}],"claveRespuesta":"a"}]}
-   ```
+| Señal | Para qué |
+|---|---|
+| `BoundingBox.Bottom` | Línea base: agrupa palabras en la misma línea |
+| `BoundingBox.Top` / `Height` | Descartar márgenes y calcular tolerancias |
+| `BoundingBox.Left` | Detectar la sangría de las opciones y alinear continuaciones |
+| Salto vertical entre líneas | Distinguir "continuación" de "pregunta nueva" |
 
-   Gracias a la gramática el modelo **no puede** emitir JSON inválido: no hace falta reintentar ni
-   validar con expresiones regulares.
-4. La salida se deserializa a `Models/Pregunta` y se normaliza (el modelo a veces mete la letra de la
-   opción dentro del texto o copia la clave tal cual aparece: `1-b` → `b`).
-5. El test se guarda en `%APPDATA%\Rpaso\tests.json`.
+### Rendimiento real medido
 
-El progreso se guarda en `%APPDATA%\Rpaso\progreso.json` y alimenta las preguntas **falladas**
-("por reforzar") que puedes repasar en bloque.
+| PDF | Preguntas | Tiempo |
+| --- | --- | --- |
+| wuolah-free-Tests-Respuestas.pdf (66 pág.) | 388 | 1,8 s |
+| wuolah-free-RECOPILACION-TEST-PROCESOS.pdf | 287 | 1,9 s |
+| wuolah-free-MEGATEST-PROCESOS-1P.pdf | 190 | 1,4 s |
+| wuolah-free-TEST-PRIMER-PARCIAL-KANSEI.pdf | 173 | 1,4 s |
+| wuolah-free-Test-Parcial-1-Kansei.pdf (sin letras en las opciones) | 151 | 0,6 s |
+| wuolah-free-TEST-TEORIA.pdf | 50 | 1,3 s |
+| wuolah-free-Test-1-parcial.pdf | 22 | 1,1 s |
+| wuolah-free-Tema-2.pdf | 12 | 1,2 s |
 
 ---
 
@@ -113,34 +105,34 @@ El progreso se guarda en `%APPDATA%\Rpaso\progreso.json` y alimenta las pregunta
 
 ```
 Rpaso/
-├── Models/                 Modelo de dominio (records inmutables, sin dependencias de UI)
-│   ├── Carpeta.cs          Carpeta temática
-│   ├── ColorCarpeta.cs     Paleta de colores
+├── Models/                     Modelo de dominio (records inmutables, sin UI)
+│   ├── Carpeta.cs              Carpeta temática
+│   ├── ColorCarpeta.cs         Paleta de colores
 │   ├── Opcion.cs
 │   ├── Pregunta.cs
-│   ├── ProgresoPregunta.cs Progreso del usuario sobre cada pregunta
-│   └── Test.cs             Examen importado
-├── Services/               Infraestructura
+│   ├── ProgresoPregunta.cs     Progreso del usuario sobre cada pregunta
+│   └── Test.cs                 Examen importado
+├── Services/
 │   ├── IServicioAlmacenamiento.cs   Persistencia JSON
-│   ├── IServicioExtraccionPdf.cs   Lectura del PDF
+│   ├── IServicioExtraccionPdf.cs   Lectura del PDF con PdfPig
 │   ├── IServicioImportacion.cs     Caso de uso: PDF → test guardado
-│   ├── IServicioEstructuracionIa.cs
+│   ├── IServicioParserExamen.cs    Contrato del parser geométrico
 │   ├── ServicioAlmacenamiento.cs
 │   ├── ServicioExtraccionPdf.cs
-│   ├── ServicioEstructuracionIa.cs  LLamaSharp + gramática GBNF
-│   └── RespuestaExtraida.cs         DTO de la respuesta del modelo
-├── ViewModels/             Presentación y estado (CommunityToolkit.Mvvm)
-├── Views/                  XAML
-│   ├── MainWindow.axaml    Shell: barra lateral + cabecera + contenido + modal
-│   ├── HomeView.axaml      Inicio: métricas y carpetas
-│   ├── FolderView.axaml    Carpetas: PDFs y acciones de práctica
-│   └── QuizView.axaml      Modo examen
+│   └── ServicioParserExamen.cs     ⭐ el parser geométrico
+├── ViewModels/                 Presentación y estado (CommunityToolkit.Mvvm)
+├── Views/                      XAML
+│   ├── MainWindow.axaml        Shell: barra lateral + cabecera + contenido + modal
+│   ├── HomeView.axaml          Inicio: métricas y carpetas
+│   ├── FolderView.axaml        Carpetas: PDFs y acciones de práctica
+│   └── QuizView.axaml          Modo examen
 ├── Assets/Estilos/
-│   ├── Tema.axaml          Paleta (resources)
-│   └── Estilos.axaml       Estilos de controles (styles)
-├── App.axaml               Registro de recursos, estilos y ViewLocator
-├── ViewLocator.cs          ViewModel → View por convención de nombre
-└── ModoVerificacion.cs     Modo consola `--verificar`
+│   ├── Tema.axaml              Paleta (recursos)
+│   └── Estilos.axaml           Estilos de controles
+├── App.axaml                   Registro de recursos, estilos y ViewLocator
+├── ViewLocator.cs              ViewModel → View por convención de nombre
+├── ModoVerificacion.cs         Modos de consola (--verificar, --texto, --geometria, --analizar)
+└── Program.cs                  Punto de entrada
 ```
 
 ### Navegación
@@ -157,51 +149,36 @@ Por eso las vistas **deben** llamarse `XxxView` (no `XxxWindow`): el `ViewLocato
 
 ---
 
-## Casos reales: qué esperar
-
-El comportamiento depende mucho del PDF de origen. Estos son los casos que se han comprobado con
-exámenes reales:
-
-| Tipo de PDF | Qué ocurre |
-| --- | --- |
-| Texto con opciones `a) b) c)` y clave de respuestas | ✅ Funciona perfecto: enunciados, opciones y claves correctas |
-| Texto con opciones **sin letra** (una línea por opción) | ⚠️ Funciona: el modelo asigna las letras `a, b, c...` por orden |
-| Examen de tipo **"señalale la respuesta incorrecta"** | ⚠️ La clave guarda la opción **incorrecta**, no la correcta |
-| PDF **sin clave de respuestas** | ⚠️ El modelo debe adivinar la clave: se usa la primera opción |
-| PDF **escaneado** (sin capa de texto) | ❌ "Páginas con texto: 0". Necesita OCR |
-| PDF con **anuncios y avisos legales** | ⚠️ Pueden aparecer como preguntas espurias |
-
-### Ruido del documento
-
-Los PDF de descarga (wuolah, campus virtuales…) traen **anuncios, avisos de derechos de autor,
-portadas y marcas de agua**. El prompt le dice al modelo que los ignore, pero un modelo de 1,5B
-a veces se cuelga con la portada y se inventa alguna pregunta a partir de ella.
-
-Si te pasa, la solución más simple es **un modelo más grande** (Qwen2.5-3B, ~2 GB) o **limpiar el
-PDF antes de importarlo**.
-
----
-
 ## Notas técnicas (trampas encontradas)
 
 - **`PdfPig`, no `UglyToad.PdfPig`.** El paquete de NuGet cambió de ID; el *namespace* sigue siendo
-  `UglyToad.PdfPig`. Las versiones estables (`0.1.16`) están en `PdfPig`; el ID antiguo ya no las publica.
-- **`.NET 10` es necesario.** La build `netstandard2.0` de LLamaSharp 0.30.0 no incluye
-  `NativeLibraryConfig.WithSearchDirectory`, que hace falta para localizar los binarios nativos de
-  llama.cpp cuando el directorio de trabajo no es la carpeta del ejecutable.
-- **Los nombres de regla GBNF no admiten guion bajo.** `lista_opciones` se interpreta como `lista`
-  seguido de `_opciones` y el análisis de la gramática falla. Usa `listaOpciones` o `lista-opciones`.
-- **`LLamaTemplate.Apply()` devuelve un `ReadOnlySpan<byte>`**, cuyo `ToString()` es
-  `"System.ReadOnlySpan<Byte>[1234]"`, no el contenido. Usa
-  `PromptTemplateTransformer.ToModelPrompt(plantilla)`.
-- **El modelo no se copia en cada compilación** (son cientos de MB y bloquearía el fichero mientras se
-  descarga). Se copia al publicar mediante el objetivo `CopiarModelosAlPublicar`.
+  `UglyToad.PdfPig`.
+- **`Regex.Match()` nunca devuelve `null`.** Devuelve un `Match` con `Success == false`. Comprobar
+  `match is not null` hace que **todo** case con el patrón. Hay que usar `match is { Success: true }`.
+- **La Y de PDF crece hacia arriba.** El orden de lectura de una página es de Y **mayor** a menor, y el
+  pie de página son las Y **pequeñas**.
+- **`TextBox.Watermark` está obsoleto** en Avalonia 12: usa `PlaceholderText`.
+- **Un `ResourceDictionary` no admite `<Style>`.** Los estilos van en un fichero con raíz `<Styles>` que se
+  incluye con `StyleInclude`; los recursos (pinceles) van en otro con raíz `<ResourceDictionary>`.
+- **`Application.Resources` necesita un `ResourceDictionary` intermedio** para poder usar
+  `ResourceDictionary.MergedDictionaries`.
 - **Windows Defender Application Control (WDAC)** de algunas empresas bloquea binarios gestionados sin
-  firmar. Si el ejecutable no arranca, mira el log
-  `Microsoft-Windows-CodeIntegrity/Operational`.
+  firmar. Si el ejecutable no arranca, mira el log `Microsoft-Windows-CodeIntegrity/Operational`.
 
 ### Depuración
 
-`RPASO_DEBUG_JSON=1` imprime el prompt y el JSON crudo que genera el modelo.
+`RPASO_DEBUG_JSON=1` ya no aplica (no hay IA).
 
-`RPASO_TEST_VISTA=carpeta|quiz` arranca directamente en una vista concreta (solo para depuración).
+`RPASO_TEST_VISTA=carpeta|quiz|quiz-corregido` arranca directamente en una vista concreta (solo depuración).
+
+---
+
+## Límites conocidos
+
+- **PDF escaneados**: sin capa de texto → 0 preguntas. Haría falta OCR.
+- **PDF a dos columnas**: el parser asume una sola columna de texto. En un PDF a dos columnas las líneas
+  se mezclarían.
+- **Claves de respuesta**: si el PDF no incluye la clave, se usa la primera opción. Si el examen es del
+  tipo *"señalale la respuesta incorrecta"*, la clave que trae el examen es la opción **incorrecta**, y así
+  se guarda.
+- **Exámenes sin numerar**: si no hay clave numerada, no se puede emparejar la clave con la pregunta.

@@ -27,6 +27,7 @@ public sealed class HomeViewModel : ViewModelBase
                     break;
                 case nameof(MainViewModel.TotalFalladas):
                     OnPropertyChanged(nameof(TotalFalladas));
+                    OnPropertyChanged(nameof(HayFalladas));
                     break;
                 case nameof(MainViewModel.Carpetas):
                     OnPropertyChanged(nameof(Carpetas));
@@ -43,6 +44,8 @@ public sealed class HomeViewModel : ViewModelBase
     public int TotalPreguntas => _principal.TotalPreguntas;
 
     public int TotalFalladas => _principal.TotalFalladas;
+
+    public bool HayFalladas => _principal.TotalFalladas > 0;
 
     public string TextoCarpetas => Carpetas.Count == 1 ? "1 carpeta activa" : $"{Carpetas.Count} carpetas activas";
 

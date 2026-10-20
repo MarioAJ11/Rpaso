@@ -50,7 +50,7 @@ public partial class App : Application
     {
         var vista = Environment.GetEnvironmentVariable("RPASO_TEST_VISTA");
 
-        if (string.IsNullOrEmpty(vista))
+        if (vista is not ("carpeta" or "quiz" or "quiz-corregido"))
             return;
 
         await viewModel.CargarDatosAsync();
