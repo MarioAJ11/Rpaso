@@ -186,7 +186,9 @@ public sealed class ServicioEstructuracionIa : IServicioEstructuracionIa, IDispo
     }
 
     /// <summary>
-    /// Sube desde el directorio del ejecutable buscando la carpeta de modelos del proyecto.
+    /// Sube desde el directorio del ejecutable buscando la raíz del proyecto.
+    /// Se identifica por el .csproj: buscar por "Assets\Modelos" no vale, porque esa carpeta
+    /// puede existir vacía en la carpeta de salida y la búsqueda se quedaría ahí.
     /// </summary>
     private static string? BuscarRaizProyecto(string directorioBase)
     {
@@ -194,7 +196,7 @@ public sealed class ServicioEstructuracionIa : IServicioEstructuracionIa, IDispo
 
         for (var nivel = 0; nivel < 6 && actual is not null; nivel++)
         {
-            if (Directory.Exists(Path.Combine(actual.FullName, "Assets", "Modelos")))
+            if (File.Exists(Path.Combine(actual.FullName, "Rpaso.csproj")))
                 return actual.FullName;
 
             actual = actual.Parent;
