@@ -57,6 +57,15 @@ dotnet run -- --verificar "C:\ruta\a\tu\examen.pdf"
 
 Imprime las preguntas extraídas y la clave de cada una. Útil para depurar el modelo.
 
+Y si lo que falla es la **extracción** (no el modelo), este modo te enseña el texto tal cual sale del PDF:
+
+```powershell
+dotnet run -- --texto "C:\ruta\a\tu\examen.pdf"
+```
+
+> Si dice "Páginas con texto: 0", el PDF es un **escaneo sin capa de texto**: la app no puede leerlo
+> (haría falta OCR).
+
 ### 5. Publicar (ejecutable autocontenido)
 
 ```powershell
@@ -145,6 +154,31 @@ Rpaso.ViewModels.HomeViewModel  →  Rpaso.Views.HomeView
 
 Por eso las vistas **deben** llamarse `XxxView` (no `XxxWindow`): el `ViewLocator` sustituye
 `"ViewModel"` por `"View"` en el nombre del tipo.
+
+---
+
+## Casos reales: qué esperar
+
+El comportamiento depende mucho del PDF de origen. Estos son los casos que se han comprobado con
+exámenes reales:
+
+| Tipo de PDF | Qué ocurre |
+| --- | --- |
+| Texto con opciones `a) b) c)` y clave de respuestas | ✅ Funciona perfecto: enunciados, opciones y claves correctas |
+| Texto con opciones **sin letra** (una línea por opción) | ⚠️ Funciona: el modelo asigna las letras `a, b, c...` por orden |
+| Examen de tipo **"señalale la respuesta incorrecta"** | ⚠️ La clave guarda la opción **incorrecta**, no la correcta |
+| PDF **sin clave de respuestas** | ⚠️ El modelo debe adivinar la clave: se usa la primera opción |
+| PDF **escaneado** (sin capa de texto) | ❌ "Páginas con texto: 0". Necesita OCR |
+| PDF con **anuncios y avisos legales** | ⚠️ Pueden aparecer como preguntas espurias |
+
+### Ruido del documento
+
+Los PDF de descarga (wuolah, campus virtuales…) traen **anuncios, avisos de derechos de autor,
+portadas y marcas de agua**. El prompt le dice al modelo que los ignore, pero un modelo de 1,5B
+a veces se cuelga con la portada y se inventa alguna pregunta a partir de ella.
+
+Si te pasa, la solución más simple es **un modelo más grande** (Qwen2.5-3B, ~2 GB) o **limpiar el
+PDF antes de importarlo**.
 
 ---
 

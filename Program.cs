@@ -10,9 +10,9 @@ sealed class Program
     [STAThread]
     public static int Main(string[] args)
     {
-        // Modo de verificación por consola: prueba el pipeline sin abrir la interfaz.
-        if (args.Length > 0 && args[0] == "--verificar")
-            return ModoVerificacion.Ejecutar(args[1..]);
+        // Modos de verificación por consola: prueban el pipeline sin abrir la interfaz.
+        if (args.Length > 0 && args[0] is "--verificar" or "--texto")
+            return ModoVerificacion.Ejecutar(args[0], args[1..]);
 
         BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
         return 0;

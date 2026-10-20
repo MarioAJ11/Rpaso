@@ -61,13 +61,21 @@ public sealed class ServicioEstructuracionIa : IServicioEstructuracionIa, IDispo
         Reglas:
         - El texto contiene N preguntas. Debes extraerlas TODAS: una entrada en "preguntas" por cada pregunta.
           No te detengas hasta haber extraido la ultima pregunta del texto.
+        - El texto puede traer cabeceras, portadas, pies de pagina, avisos de derechos de autor,
+          codigos de agua y titulos del documento. IGNORALOS: no son preguntas.
+        - Una pregunta es un enunciado seguido de sus opciones (a, b, c...). No inventes preguntas
+          a partir de titulos, nombres de autores ni cabeceras.
+        - No repitas la misma pregunta: cada enunciado aparece una sola vez en "preguntas".
         - "enunciado" es el texto de la pregunta, SIN el numero inicial y SIN las letras de las opciones.
         - "id" de cada opcion es SU LETRA (a, b, c, d) y "texto" es el contenido SIN la letra delante.
           Ejemplo: el texto "b) 46" se extrae como id "b" y texto "46".
+        - Si las opciones del texto NO llevan letra (son solo lineas sueltas, una por opcion),
+          asignales tu las letras a, b, c... EN EL ORDEN en que aparecen.
         - Copia el texto EXACTAMENTE como aparece. No lo corrijas, no lo traduzcas, no lo reescribas:
           si el examen pone "Fotosintesis", escribe "Fotosintesis".
         - "claveRespuesta" es la LETRA de la opcion correcta (a, b, c, d). Si el examen da la clave como
           "1-b, 2-b", extrae solo la letra de la opcion: "b".
+        - Si el examen pide "senalale la respuesta incorrecta", la clave es la opcion INCORRECTA.
         - Si el examen no incluye la clave, usa la letra de la primera opcion.
         - Ignora los textos que no sean preguntas con opciones.
 
@@ -88,14 +96,15 @@ public sealed class ServicioEstructuracionIa : IServicioEstructuracionIa, IDispo
         """;
 
     private const int TamanoContexto = 4096;
-    private const int TokensMaximosSalida = 1536;
+    private const int TokensMaximosSalida = 2048;
 
     /// <summary>
     /// Presupuesto de caracteres por fragmento. El contexto del modelo es de 4096 tokens y la
-    /// salida puede ocupar 1536, así que solo quedan unos 2500 tokens para el prompt:
-    /// en español eso son del orden de 6000 caracteres.
+    /// salida puede ocupar 2048, así que solo quedan unos 2000 tokens para el prompt:
+    /// en español eso son del orden de 5000 caracteres. Se deja margen para las preguntas
+    /// que el modelo tiene que escribir.
     /// </summary>
-    private const int CaracteresPorFragmento = 5500;
+    private const int CaracteresPorFragmento = 3500;
 
     private static readonly JsonSerializerOptions OpcionesJson = new()
     {
@@ -412,7 +421,7 @@ public sealed class ServicioEstructuracionIa : IServicioEstructuracionIa, IDispo
             _semforo.Release();
         }
 
-        return InterpretarJson(construccion.ToString(), fragmento);
+        return InterpretarJson(construccion.ToString());
     }
 
     private static bool EsJsonCompleto(string json)
@@ -429,10 +438,11 @@ public sealed class ServicioEstructuracionIa : IServicioEstructuracionIa, IDispo
     }
 
     /// <summary>
-    /// Interpreta el JSON emitido por el modelo. Si la generación se cortó por el límite de
-    /// tokens, se intenta recuperar el último objeto completo en lugar de perder todo el fragmento.
+    /// Interpreta el JSON emitido por el modelo.
+    /// Si la generación se cortó por el límite de tokens, se recuperan las preguntas que
+    /// sí الأمور complete en lugar de perder el fragmento entero.
     /// </summary>
-    private static RespuestaExtraida? InterpretarJson(string json, string fragmento)
+    private static RespuestaExtraida? InterpretarJson(string json)
     {
         if (string.IsNullOrWhiteSpace(json))
             return null;
@@ -440,31 +450,95 @@ public sealed class ServicioEstructuracionIa : IServicioEstructuracionIa, IDispo
         if (Environment.GetEnvironmentVariable("RPASO_DEBUG_JSON") == "1")
         {
             Console.WriteLine("===== PROMPT =====");
-            Console.WriteLine(fragmento);
-            Console.WriteLine("===== JSON CRUDO =====");
             Console.WriteLine(json);
             Console.WriteLine("===== FIN =====");
         }
 
-        var candidatas = new List<string> { json };
+        // 1) Camino normal: el JSON viene completo.
+        try
+        {
+            return JsonSerializer.Deserialize<RespuestaExtraida>(json, OpcionesJson);
+        }
+        catch (JsonException)
+        {
+            // Se pasa al modo tolerante.
+        }
 
-        var ultimoCierre = json.LastIndexOf('}');
-        if (ultimoCierre > 0 && ultimoCierre < json.Length - 1)
-            candidatas.Add(json[..(ultimoCierre + 1)]);
+        // 2) Modo tolerante: se recuperan los objetos completos aunque la salida esté truncada.
+        var recuperadas = new List<PreguntaExtraida>();
 
-        foreach (var candidata in candidatas)
+        foreach (var trozo in ExtraerObjetosJson(json))
         {
             try
             {
-                return JsonSerializer.Deserialize<RespuestaExtraida>(candidata, OpcionesJson);
+                var pregunta = JsonSerializer.Deserialize<PreguntaExtraida>(trozo, OpcionesJson);
+
+                if (pregunta is not null
+                    && !string.IsNullOrWhiteSpace(pregunta.Enunciado)
+                    && pregunta.Opciones is { Count: >= 2 })
+                {
+                    recuperadas.Add(pregunta);
+                }
             }
             catch (JsonException)
             {
-                // Se prueba la siguiente variante (por ejemplo, recortar el último objeto inacabado).
+                // Objeto incompleto: se descarta.
             }
         }
 
-        return null;
+        return recuperadas.Count > 0 ? new RespuestaExtraida(recuperadas) : null;
+    }
+
+    /// <summary>
+    /// Extrae del texto todos los objetos JSON {...} que estén balanceados, a cualquier
+    /// profundidad. Así, aunque la generación se corte a media pregunta, se recuperan
+    /// todas las preguntas anteriores que ya estaban completas.
+    /// </summary>
+    private static IEnumerable<string> ExtraerObjetosJson(string json)
+    {
+        var pila = new Stack<int>();
+        var enComilla = false;
+        var escape = false;
+
+        for (var i = 0; i < json.Length; i++)
+        {
+            var c = json[i];
+
+            if (escape)
+            {
+                escape = false;
+                continue;
+            }
+
+            if (enComilla)
+            {
+                if (c == '\\')
+                    escape = true;
+                else if (c == '"')
+                    enComilla = false;
+
+                continue;
+            }
+
+            switch (c)
+            {
+                case '"':
+                    enComilla = true;
+                    break;
+
+                case '{':
+                    pila.Push(i);
+                    break;
+
+                case '}':
+                    if (pila.Count > 0)
+                    {
+                        var inicio = pila.Pop();
+                        yield return json[inicio..(i + 1)];
+                    }
+                    break;
+            }
+        }
     }
 
     public void Dispose()

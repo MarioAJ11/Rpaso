@@ -1,15 +1,43 @@
 using System.Diagnostics;
+using System.Text;
 using Rpaso.Services;
 
 namespace Rpaso;
 
 /// <summary>
-/// Modo de verificación por consola. Permite probar el pipeline completo
-/// (PDF -> texto -> modelo local -> preguntas) sin abrir la interfaz gráfica.
+/// Modos de verificación por consola. Permiten probar el pipeline sin abrir la interfaz.
 /// </summary>
 internal static class ModoVerificacion
 {
-    public static int Ejecutar(string[] args)
+    /// <summary>
+    /// Muestra el texto extraído del PDF, página a página. Sirve para comprobar si el PDF
+    /// tiene capa de texto (si está escaneado, aquí saldría vacío).
+    /// </summary>
+    private static int MostrarTexto(string[] args)
+    {
+        if (args.Length == 0 || !File.Exists(args[0]))
+        {
+            Console.WriteLine("Uso: Rpaso.exe --texto <ruta.pdf>");
+            return 1;
+        }
+
+        var paginas = new ServicioExtraccionPdf().ExtraerPaginasAsync(args[0]).GetAwaiter().GetResult();
+
+        Console.WriteLine($"Páginas con texto: {paginas.Count}");
+
+        for (var i = 0; i < paginas.Count; i++)
+        {
+            Console.WriteLine($"\n========== PÁGINA {i + 1} ({paginas[i].Length} caracteres) ==========");
+            Console.WriteLine(paginas[i]);
+        }
+
+        return paginas.Count > 0 ? 0 : 2;
+    }
+
+    /// <summary>
+    /// Ejecuta el pipeline completo (PDF -> texto -> modelo local -> preguntas) e imprime el resultado.
+    /// </summary>
+    private static int Ejecutar(string[] args)
     {
         if (args.Length == 0 || !File.Exists(args[0]))
         {
@@ -47,4 +75,10 @@ internal static class ModoVerificacion
 
         return test.Preguntas.Count > 0 ? 0 : 2;
     }
+
+    public static int Ejecutar(string modo, string[] args) => modo switch
+    {
+        "--texto" => MostrarTexto(args),
+        _ => Ejecutar(args)
+    };
 }
