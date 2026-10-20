@@ -53,21 +53,38 @@ public sealed class ServicioEstructuracionIa : IServicioEstructuracionIa, IDispo
         """;
 
     private const string InstruccionesSistema = """
-        Eres un extractor de examenes tipo test. Conviertes el texto de un examen en un JSON con sus preguntas.
+        Eres un extractor de examenes tipo test. Conviertes el texto de un examen en un JSON con TODAS sus preguntas.
 
         Formato de salida, exactamente con estos nombres de campo:
-        {"preguntas":[{"enunciado":"texto de la pregunta","opciones":[{"id":"a","texto":"texto de la opcion"}],"claveRespuesta":"a"}]}
+        {"preguntas":[{"enunciado":"...","opciones":[{"id":"a","texto":"..."}],"claveRespuesta":"a"}]}
 
         Reglas:
-        - Extrae TODAS las preguntas del texto, sin omitir ninguna y sin inventar ninguna.
-        - "enunciado" es el texto de la pregunta SIN el numero y SIN las letras de las opciones.
-        - "id" de cada opcion es SU LETRA (a, b, c, d) y "texto" es el contenido de la opcion
-          SIN la letra delante. Ejemplo: el texto "b) 46" se extrae como id "b" y texto "46".
-        - "claveRespuesta" es la LETRA de la opcion correcta (a, b, c, d). Nunca copies la clave
-          tal cual aparece en el examen: si el examen dice "1-b, 2-b", la clave de esa pregunta es "b".
+        - El texto contiene N preguntas. Debes extraerlas TODAS: una entrada en "preguntas" por cada pregunta.
+          No te detengas hasta haber extraido la ultima pregunta del texto.
+        - "enunciado" es el texto de la pregunta, SIN el numero inicial y SIN las letras de las opciones.
+        - "id" de cada opcion es SU LETRA (a, b, c, d) y "texto" es el contenido SIN la letra delante.
+          Ejemplo: el texto "b) 46" se extrae como id "b" y texto "46".
+        - Copia el texto EXACTAMENTE como aparece. No lo corrijas, no lo traduzcas, no lo reescribas:
+          si el examen pone "Fotosintesis", escribe "Fotosintesis".
+        - "claveRespuesta" es la LETRA de la opcion correcta (a, b, c, d). Si el examen da la clave como
+          "1-b, 2-b", extrae solo la letra de la opcion: "b".
         - Si el examen no incluye la clave, usa la letra de la primera opcion.
-        - Si una pregunta continua en la pagina siguiente, unela con su continuacion.
         - Ignora los textos que no sean preguntas con opciones.
+
+        EJEMPLO
+        Entrada:
+        1. Cual es la capital de Francia?
+           a) Berlin
+           b) Paris
+           c) Roma
+        2. Cuantos lados tiene un triangulo?
+           a) 2
+           b) 3
+           c) 4
+        Respuestas: 1-b, 2-b
+
+        Salida:
+        {"preguntas":[{"enunciado":"Cual es la capital de Francia?","opciones":[{"id":"a","texto":"Berlin"},{"id":"b","texto":"Paris"},{"id":"c","texto":"Roma"}],"claveRespuesta":"b"},{"enunciado":"Cuantos lados tiene un triangulo?","opciones":[{"id":"a","texto":"2"},{"id":"b","texto":"3"},{"id":"c","texto":"4"}],"claveRespuesta":"b"}]}
         """;
 
     private const int TamanoContexto = 4096;
@@ -393,7 +410,7 @@ public sealed class ServicioEstructuracionIa : IServicioEstructuracionIa, IDispo
             _semforo.Release();
         }
 
-        return InterpretarJson(construccion.ToString());
+        return InterpretarJson(construccion.ToString(), fragmento);
     }
 
     private static bool EsJsonCompleto(string json)
@@ -413,10 +430,19 @@ public sealed class ServicioEstructuracionIa : IServicioEstructuracionIa, IDispo
     /// Interpreta el JSON emitido por el modelo. Si la generación se cortó por el límite de
     /// tokens, se intenta recuperar el último objeto completo en lugar de perder todo el fragmento.
     /// </summary>
-    private static RespuestaExtraida? InterpretarJson(string json)
+    private static RespuestaExtraida? InterpretarJson(string json, string fragmento)
     {
         if (string.IsNullOrWhiteSpace(json))
             return null;
+
+        if (Environment.GetEnvironmentVariable("RPASO_DEBUG_JSON") == "1")
+        {
+            Console.WriteLine("===== PROMPT =====");
+            Console.WriteLine(fragmento);
+            Console.WriteLine("===== JSON CRUDO =====");
+            Console.WriteLine(json);
+            Console.WriteLine("===== FIN =====");
+        }
 
         var candidatas = new List<string> { json };
 

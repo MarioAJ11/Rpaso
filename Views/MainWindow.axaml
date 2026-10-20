@@ -141,12 +141,12 @@
 
                     <StackPanel Spacing="7">
                         <TextBlock Text="NOMBRE DE LA CARPETA" Classes="etiqueta" />
-                        <TextBox Text="{Binding NuevaCarpetaNombre}" Watermark="Ej: Bases de Datos y SQL" />
+                        <TextBox Text="{Binding NuevaCarpetaNombre}" PlaceholderText="Ej: Bases de Datos y SQL" />
                     </StackPanel>
 
                     <StackPanel Spacing="7">
                         <TextBlock Text="DESCRIPCIÓN (OPCIONAL)" Classes="etiqueta" />
-                        <TextBox Text="{Binding NuevaCarpetaDescripcion}" Watermark="Ej: Temas 1 al 4" />
+                        <TextBox Text="{Binding NuevaCarpetaDescripcion}" PlaceholderText="Ej: Temas 1 al 4" />
                     </StackPanel>
 
                     <StackPanel Spacing="9">
