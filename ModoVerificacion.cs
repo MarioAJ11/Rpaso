@@ -60,13 +60,33 @@ internal static class ModoVerificacion
         Console.WriteLine($"Página {numeroPagina}: {pagina.Width:F1} x {pagina.Height:F1} puntos");
         Console.WriteLine($"Palabras: {pagina.GetWords().Count()}");
         Console.WriteLine();
-        Console.WriteLine("Y superior   Y inferior  X izq   X der   Texto");
-        Console.WriteLine(new string('-', 100));
+        Console.WriteLine("Y superior   Y inferior  X izq   X der   Fuente                 Texto");
+        Console.WriteLine(new string('-', 118));
 
         foreach (var palabra in pagina.GetWords().OrderByDescending(p => p.BoundingBox.Bottom))
         {
             var caja = palabra.BoundingBox;
-            Console.WriteLine($"{caja.Top,9:F1} {caja.Bottom,10:F1} {caja.Left,7:F1} {caja.Right,7:F1}  {palabra.Text}");
+            var fuente = palabra.Letters.Count > 0 ? palabra.Letters[0].FontName : "?";
+            Console.WriteLine($"{caja.Top,9:F1} {caja.Bottom,10:F1} {caja.Left,7:F1} {caja.Right,7:F1}  {fuente,-22} {palabra.Text}");
+        }
+
+        // Trazos vectoriales: así se dibujan las casillas marcadas de un test.
+        try
+        {
+            var trazos = pagina.Paths;
+            Console.WriteLine();
+            Console.WriteLine($"Trazos vectoriales en la pagina: {trazos.Count}");
+
+            foreach (var trazo in trazos.Take(20))
+            {
+                var caja = trazo.GetBoundingRectangle();
+
+                Console.WriteLine($"  bbox={caja}  relleno={trazo.IsFilled} puntos={trazo.Count} color={trazo.FillColor}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"No se pudieron leer los trazos: {ex.Message}");
         }
 
         return 0;
@@ -128,13 +148,13 @@ internal static class ModoVerificacion
         var parser = new ServicioParserExamen();
 
         Console.WriteLine($"Página {numeroPagina}");
-        Console.WriteLine("Tipo        Y base    X izq   Texto");
-        Console.WriteLine(new string('-', 110));
+        Console.WriteLine("Tipo        Y base    X izq   X cont  Negrita  Texto");
+        Console.WriteLine(new string('-', 122));
 
-        foreach (var (baseLinea, izquierda, texto, tipo, letra) in parser.DiagnosticarPagina(args[0], numeroPagina))
+        foreach (var (baseLinea, izquierda, xContenido, texto, tipo, letra, negrita) in parser.DiagnosticarPagina(args[0], numeroPagina))
         {
             var marca = letra is null ? "" : $" [{letra}]";
-            Console.WriteLine($"{tipo,-12} {baseLinea,7:F1} {izquierda,7:F1}  {texto}{marca}");
+            Console.WriteLine($"{tipo,-12} {baseLinea,7:F1} {izquierda,7:F1} {xContenido,7:F1}  {(negrita ? "SI" : "-"),-9} {texto}{marca}");
         }
 
         return 0;

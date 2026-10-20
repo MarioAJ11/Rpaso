@@ -85,6 +85,20 @@ PDF
 | `BoundingBox.Top` / `Height` | Descartar márgenes y calcular tolerancias |
 | `BoundingBox.Left` | Detectar la sangría de las opciones y alinear continuaciones |
 | Salto vertical entre líneas | Distinguir "continuación" de "pregunta nueva" |
+| `Letter.FontDetails.IsBold` | Detectar la opción correcta (en estos tests va en negrita) |
+
+### Cómo se averigua la respuesta correcta
+
+1. **Clave numérica** en el PDF (`Respuestas: 1-b, 2-c`) → manda esa.
+2. **Opción en negrita**: si hay exactamente una, esa es la correcta.
+3. Si no hay ninguna, se usa la primera opción.
+
+> La negrita se lee de `FontDetails.IsBold`, **no** del nombre de la fuente: el prefijo de
+> subconjunto (`DAAAAA+Times`) se asigna por orden de aparición y no dice nada.
+>
+> No todos los exams marcan la respuesta en negrita. De los PDFs revisados, 3 sí lo hacen
+> (MEGATEST, TEST-TEORIA, Tests-Respuestas) y 4 no (Tema-2, los de Kansei, Test-1-parcial):
+> en esos la clave cae en la primera opción hasta que se corrija a mano.
 
 ### Rendimiento real medido
 
