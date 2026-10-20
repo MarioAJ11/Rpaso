@@ -133,9 +133,9 @@ public sealed class ServicioParserExamen : IServicioParserExamen
         public bool Negrita => Palabras.Any(p =>
             p.Letters.Count > 0
             && (p.Letters[0].FontDetails?.IsBold == true
-                || p.Letters[0].FontName.Contains("Bold", StringComparison.OrdinalIgnoreCase)
-                || p.Letters[0].FontName.Contains("Heavy", StringComparison.OrdinalIgnoreCase)
-                || p.Letters[0].FontName.Contains("Black", StringComparison.OrdinalIgnoreCase)));
+                || (p.Letters[0].FontName?.Contains("Bold", StringComparison.OrdinalIgnoreCase) ?? false)
+                || (p.Letters[0].FontName?.Contains("Heavy", StringComparison.OrdinalIgnoreCase) ?? false)
+                || (p.Letters[0].FontName?.Contains("Black", StringComparison.OrdinalIgnoreCase) ?? false)));
     }
 
     /// <summary>
