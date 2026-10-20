@@ -1,0 +1,13 @@
+Repaso
+Copyright (c) 2026
+
+Aplicación de escritorio para convertir PDFs de exámenes tipo test en tests
+interactivos y practicarlos.
+
+Todo el procesamiento ocurre en el equipo del usuario: los PDFs se leen, se
+analizan y se guardan localmente. La aplicación no envía datos a ningún
+servidor, no incluye modelos de IA y no requiere conexión a internet.
+
+Este programa se distribuye tal cual, sin garantía de ningún tipo. El usuario
+es responsable de los documentos que importe y de la verificación de las
+preguntas extraídas.

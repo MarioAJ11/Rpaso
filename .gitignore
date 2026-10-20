@@ -1,0 +1,20 @@
+# .NET Core
+bin/
+obj/
+*.user
+*.suo
+*.log
+
+# Salida de publicación (236 MB con el runtime de .NET) y del instalador
+publicacion/
+dist/
+
+# Certificado de firma exportado (lo regenera herramientas\instalar.ps1)
+herramientas/certificado/
+
+# Rider / Visual Studio
+.idea/
+.vs/
+
+# Contexto de trabajo (reglas, referencias)
+context/

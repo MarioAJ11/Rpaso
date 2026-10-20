@@ -72,6 +72,35 @@ powershell -ExecutionPolicy Bypass -File .\herramientas\firmar.ps1 -Ruta .\publi
 El usuario final solo hace **doble clic** en `Rpaso.exe`: no necesita instalar .NET ni nada más.
 **Firmarlo es obligatorio** en equipos con Smart App Control (ver la nota de arriba).
 
+### Instalador .exe (Inno Setup)
+
+```powershell
+.\herramientas\instalar.ps1
+```
+
+Un solo comando que hace los cuatro pasos: **publicar → firmar → compilar el instalador → firmarlo**.
+Deja el instalador en `dist\Rpaso-1.0.0-setup.exe` (unos 55 MB).
+
+El instalador:
+
+- instala la app en `C:\Program Files\Repaso`,
+- crea accesos directos en el **menú Inicio** y en el **Escritorio**,
+- permite **iniciar Repaso al encender el ordenador** (opcional),
+- al desinstalar, pregunta si quieres borrar tus exámenes y tu progreso (si no, se conservan).
+
+> **Requisito**: [Inno Setup 6](https://jrsoftware.org/isinfo.php) instalado. Si no lo tienes:
+> `winget install --id JRSoftware.InnoSetup -e`
+
+#### El detalle que hace que la app arranque en un PC con Smart App Control
+
+Code Integrity valida las firmas contra los almacenes de la **máquina** (`LocalMachine\Root` y
+`LocalMachine\TrustedPublisher`). Un certificado autofirmado que solo esté en el almacén del
+**usuario** no vale: la app arranca, pero al cargar sus DLL se bloquea con `0x800711C7`.
+
+Por eso el instalador — que se ejecuta elevado por UAC — añade el certificado a los dos almacenes
+del equipo antes de lanzar la app. En un equipo ajeno esto instala una CA personal en ese equipo;
+para distribución al público hay que usar un certificado de firma de código comercial.
+
 ---
 
 ## Cómo funciona el parser geométrico
@@ -312,6 +341,11 @@ Por eso las vistas **deben** llamarse `XxxView` (no `XxxWindow`): el `ViewLocato
   `RadioButton` marcado sale rojo (el acento del sistema). Por eso la casilla de selección es un
   `ToggleButton` propio (`Classes="casilla"`) y la respuesta correcta un `Button` con un círculo
   interior.
+- **En PowerShell las variables no distinguen mayúsculas**: un parámetro `[string[]]$Fichero` y un
+  bucle `foreach ($fichero in ...)` son **la misma variable**, y al asignarle un `FileInfo` la
+  conversión a `string[]` lo deja en `$null`.
+- **El filtro `-Filter "Rpaso.*"` de `Get-ChildItem` no casa con `Rpaso-1.0.0-setup.exe`**: el
+  patrón de FileSystem de Windows no funciona como se espera. Hay que filtrar con `-like`.
 
 ### Depuración
 
