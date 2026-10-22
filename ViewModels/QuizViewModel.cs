@@ -12,6 +12,13 @@ public sealed partial class QuizViewModel : ViewModelBase
     private readonly Action<string, bool> _registrarResultado;
     private readonly Action? _alSalir;
 
+    /// <summary>
+    /// Orden de las opciones de cada pregunta, barajado una sola vez por sesión:
+    /// así, al volver a una pregunta ya vista, las opciones no cambian de sitio,
+    /// pero cada nueva práctica re-baraja todo.
+    /// </summary>
+    private readonly Dictionary<string, List<OpcionViewModel>> _ordenOpciones = new();
+
     public QuizViewModel(
         string titulo,
         IReadOnlyList<PreguntaViewModel> preguntas,
@@ -93,10 +100,25 @@ public sealed partial class QuizViewModel : ViewModelBase
     {
         Opciones.Clear();
 
-        var clave = PreguntaActual.ClaveRespuesta;
+        var pregunta = PreguntaActual;
+        var clave = pregunta.ClaveRespuesta;
 
-        foreach (var opcion in PreguntaActual.Opciones)
-            Opciones.Add(new OpcionViewModel(opcion, clave));
+        if (!_ordenOpciones.TryGetValue(pregunta.Id, out var orden))
+        {
+            // Barajeo de Fisher-Yates sobre una copia, para no tocar la pregunta original.
+            var copia = pregunta.Opciones.ToList();
+            for (var i = copia.Count - 1; i > 0; i--)
+            {
+                var j = Random.Shared.Next(i + 1);
+                (copia[i], copia[j]) = (copia[j], copia[i]);
+            }
+
+            orden = copia.Select(o => new OpcionViewModel(o, clave)).ToList();
+            _ordenOpciones[pregunta.Id] = orden;
+        }
+
+        foreach (var opcion in orden)
+            Opciones.Add(opcion);
 
         RespuestaSeleccionada = null;
         Corregido = false;
