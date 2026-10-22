@@ -26,4 +26,22 @@
     <SolidColorBrush x:Key="BrushAviso" Color="#D97706" />
     <SolidColorBrush x:Key="BrushAvisoSuave" Color="#FFFBEB" />
 
+    <!-- Gradiente del botón principal: da profundidad al violet -->
+    <LinearGradientBrush x:Key="BrushPrimarioGradiente" StartPoint="0%,0%" EndPoint="100%,100%">
+        <GradientStop Color="#7367F0" Offset="0" />
+        <GradientStop Color="#5C54E5" Offset="0.55" />
+        <GradientStop Color="#4A42D6" Offset="1" />
+    </LinearGradientBrush>
+
+    <LinearGradientBrush x:Key="BrushPrimarioGradienteHover" StartPoint="0%,0%" EndPoint="100%,100%">
+        <GradientStop Color="#8579F5" Offset="0" />
+        <GradientStop Color="#6C63EE" Offset="0.55" />
+        <GradientStop Color="#5A51E0" Offset="1" />
+    </LinearGradientBrush>
+
+    <LinearGradientBrush x:Key="BrushPrimarioGradientePressed" StartPoint="0%,0%" EndPoint="100%,100%">
+        <GradientStop Color="#5F57DC" Offset="0" />
+        <GradientStop Color="#4A42C9" Offset="1" />
+    </LinearGradientBrush>
+
 </ResourceDictionary>

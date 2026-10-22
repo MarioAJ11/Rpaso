@@ -240,6 +240,64 @@
         <Setter Property="BorderThickness" Value="3" />
     </Style>
 
+    <!-- Aviso flotante (sustituye a la barra superior para los mensajes) -->
+    <Style Selector="Border.toast">
+        <Setter Property="Background" Value="{StaticResource BrushSuperficie}" />
+        <Setter Property="BorderBrush" Value="{StaticResource BrushBorde}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="14" />
+        <Setter Property="Padding" Value="16,12" />
+        <Setter Property="BoxShadow" Value="0 6 22 0 #14000000" />
+    </Style>
+
+    <!-- ================= BOTÓN IMPORTAR (con gradiente y animación) ================= -->
+
+    <Style Selector="Button.importar">
+        <Setter Property="Background" Value="{StaticResource BrushPrimarioGradiente}" />
+        <Setter Property="Foreground" Value="White" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="CornerRadius" Value="12" />
+        <Setter Property="Padding" Value="18,11" />
+        <Setter Property="RenderTransformOrigin" Value="50%,50%" />
+        <Setter Property="RenderTransform" Value="ScaleTransform(1)" />
+        <Setter Property="Transitions">
+            <Transitions>
+                <BrushTransition Property="Background" Duration="0:0:0.18" Easing="CubicEaseOut" />
+                <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.18" Easing="CubicEaseOut" />
+            </Transitions>
+        </Setter>
+    </Style>
+
+    <Style Selector="Button.importar:pointerover">
+        <Setter Property="Background" Value="{StaticResource BrushPrimarioGradienteHover}" />
+        <Setter Property="RenderTransform" Value="ScaleTransform(1.04)" />
+    </Style>
+
+    <Style Selector="Button.importar:pressed">
+        <Setter Property="Background" Value="{StaticResource BrushPrimarioGradientePressed}" />
+        <Setter Property="RenderTransform" Value="ScaleTransform(0.97)" />
+    </Style>
+
+    <!-- ================= TARJETA CARPETA (con pestaña) ================= -->
+
+    <Style Selector="Border.carpeta">
+        <Setter Property="Background" Value="{StaticResource BrushSuperficie}" />
+        <Setter Property="BorderBrush" Value="{StaticResource BrushBorde}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="18" />
+        <Setter Property="BoxShadow" Value="0 3 12 0 #0F172A12" />
+        <Setter Property="Transitions">
+            <Transitions>
+                <BoxShadowsTransition Property="BoxShadow" Duration="0:0:0.2" />
+            </Transitions>
+        </Setter>
+    </Style>
+
+    <Style Selector="Border.carpeta:hover">
+        <Setter Property="BoxShadow" Value="0 12 28 0 #1F5C54E5" />
+    </Style>
+
     <!-- Casilla de selección: se define aquí porque el CheckBox del tema Fluent no se ve. -->
     <Style Selector="ToggleButton.casilla">
         <Setter Property="Width" Value="24" />

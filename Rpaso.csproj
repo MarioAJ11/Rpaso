@@ -16,6 +16,15 @@
     <AvaloniaResource Include="Assets\**" />
   </ItemGroup>
 
+  <!-- La tarea de telemetría de Avalonia (Avalonia.BuildServices) falla al cargarse en
+       algunos entornos con MSB4061 y rompe la compilación. Se anula aquí ejecutando
+       un target anterior que vacía la propiedad que la dispara. -->
+  <Target Name="DisableAvaloniaTelemetry" BeforeTargets="AvaloniaStats">
+    <PropertyGroup>
+      <UsedAvaloniaProducts></UsedAvaloniaProducts>
+    </PropertyGroup>
+  </Target>
+
   <ItemGroup>
     <PackageReference Include="Avalonia" Version="12.1.4" />
     <PackageReference Include="Avalonia.Desktop" Version="12.1.4" />

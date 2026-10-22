@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Rpaso.Models;
@@ -39,8 +40,29 @@ public sealed partial class MainViewModel : ViewModelBase
     [ObservableProperty]
     private bool _ocupado;
 
+    private DispatcherTimer? _temporizadorEstado;
+
     [ObservableProperty]
     private string _estado = string.Empty;
+
+    /// <summary>
+    /// El aviso flotante se borra solo a los pocos segundos.
+    /// </summary>
+    partial void OnEstadoChanged(string value)
+    {
+        _temporizadorEstado?.Stop();
+
+        if (string.IsNullOrWhiteSpace(value))
+            return;
+
+        _temporizadorEstado = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
+        _temporizadorEstado.Tick += (_, _) =>
+        {
+            _temporizadorEstado.Stop();
+            Estado = string.Empty;
+        };
+        _temporizadorEstado.Start();
+    }
 
     /// <summary>Informe de la última importación (null si no se ha importado nada aún).</summary>
     [ObservableProperty]

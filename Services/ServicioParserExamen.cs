@@ -76,6 +76,17 @@ public sealed class ServicioParserExamen : IServicioParserExamen
         RegexOptions.Compiled);
 
     /// <summary>
+    /// Ruido que el OCR deja pegado al texto de las opciones: marcas de veredicto
+    /// sueltas y metadatos de cabecera (ENVIADO, fechas, identificadores hex).
+    /// </summary>
+    private static readonly Regex PatronRuidoOcr = new(
+        @"(?i)\b(correcta|incorrecta|respuesta|enviado|confirmaci[oó]n)\b|"
+        + @"[0-9]{1,2}/[0-9]{1,2}/[0-9]{2,4}|"
+        + @"[0-9]{1,2}:[0-9]{2}(:[0-9]{2})?|"
+        + @"[*][0-9A-Fa-f]{8,}",
+        RegexOptions.Compiled);
+
+    /// <summary>
     /// Prefijo que el PDF pone delante de la opción: "Correcta:" o "Incorrecta:".
     /// </summary>
     private static readonly Regex PatronPrefijoVeredicto = new(
@@ -636,7 +647,7 @@ public sealed class ServicioParserExamen : IServicioParserExamen
 
     private sealed class OpcionEnCurso
     {
-        public required string Letra { get; init; }
+        public required string Letra { get; set; }
         public required string Texto { get; set; }
         public bool Negrita { get; set; }
 
@@ -763,6 +774,14 @@ public sealed class ServicioParserExamen : IServicioParserExamen
         // "Respuesta correcta" va en el margen derecho de la misma línea.
         texto = PatronMarcaRespuesta.Replace(texto, "").Trim();
 
+        // Limpieza de ruido típico del OCR: las marcas de veredicto que quedan
+        // sueltas en el texto ("correcta", "incorrecta", "respuesta") y los
+        // metadatos de cabecera (ENVIADO, fechas, identificadores hex largos).
+        texto = PatronRuidoOcr.Replace(texto, "").Trim();
+        texto = texto.TrimStart(':', ' ', '-');
+        texto = texto.TrimEnd(',', ';', ':', '.', ' ', '-');
+        texto = System.Text.RegularExpressions.Regex.Replace(texto, @"\s{2,}", " ");
+
         var esCorrecta = false;
         var esIncorrecta = false;
 
@@ -804,6 +823,22 @@ public sealed class ServicioParserExamen : IServicioParserExamen
         if (PatronArchivo.IsMatch(enCurso.Enunciado.Trim()))
             return;
 
+        // Limpieza de opciones basura del OCR: texto vacío o metadatos.
+        var opcionesLimpias = enCurso.Opciones
+            .Where(o => !string.IsNullOrWhiteSpace(o.Texto) && o.Texto.Trim().Length >= 2)
+            .ToList();
+
+        // Limpieza del enunciado: quitar marcas de veredicto sueltas del OCR.
+        enCurso.Enunciado = PatronRuidoOcr.Replace(enCurso.Enunciado, "").Trim();
+        enCurso.Enunciado = System.Text.RegularExpressions.Regex.Replace(enCurso.Enunciado, @"\s{2,}", " ").Trim();
+
+        if (opcionesLimpias.Count < 2)
+            return;
+
+        enCurso.Opciones.Clear();
+        foreach (var o in opcionesLimpias)
+            enCurso.Opciones.Add(o);
+
         var id = $"q-{preguntas.Count + 1}";
 
         // La clave de respuesta, por orden de fiabilidad:
@@ -825,6 +860,29 @@ public sealed class ServicioParserExamen : IServicioParserExamen
             if (negritas.Count == 1)
                 clave = negritas[0].Letra;
         }
+
+        // Renumeración por posición: los PDFs/OCR a veces repiten letras ("a, b, b, e, e, d"),
+        // lo que provoca respuestas correctas duplicadas en el editor. Se asignan letras
+        // únicas por orden y se remapea la clave.
+        var letras = "abcdefghijklmnopqrstuvwxyz";
+        var mapeo = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        for (var i = 0; i < enCurso.Opciones.Count; i++)
+        {
+            var nueva = i < letras.Length
+                ? letras[i].ToString()
+                : ((char)('a' + i)).ToString();
+
+            if (!mapeo.ContainsKey(enCurso.Opciones[i].Letra))
+                mapeo[enCurso.Opciones[i].Letra] = nueva;
+
+            enCurso.Opciones[i].Letra = nueva;
+        }
+
+        if (mapeo.TryGetValue(clave, out var nuevaClave))
+            clave = nuevaClave;
+        else if (enCurso.Opciones.Count > 0)
+            clave = enCurso.Opciones[0].Letra;
 
         preguntas.Add(new Pregunta(
             id,
