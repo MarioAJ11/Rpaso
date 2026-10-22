@@ -260,7 +260,7 @@
         <Setter Property="CornerRadius" Value="12" />
         <Setter Property="Padding" Value="18,11" />
         <Setter Property="RenderTransformOrigin" Value="50%,50%" />
-        <Setter Property="RenderTransform" Value="ScaleTransform(1)" />
+        <Setter Property="RenderTransform" Value="scale(1)" />
         <Setter Property="Transitions">
             <Transitions>
                 <BrushTransition Property="Background" Duration="0:0:0.18" Easing="CubicEaseOut" />
@@ -271,12 +271,12 @@
 
     <Style Selector="Button.importar:pointerover">
         <Setter Property="Background" Value="{StaticResource BrushPrimarioGradienteHover}" />
-        <Setter Property="RenderTransform" Value="ScaleTransform(1.04)" />
+        <Setter Property="RenderTransform" Value="scale(1.04)" />
     </Style>
 
     <Style Selector="Button.importar:pressed">
         <Setter Property="Background" Value="{StaticResource BrushPrimarioGradientePressed}" />
-        <Setter Property="RenderTransform" Value="ScaleTransform(0.97)" />
+        <Setter Property="RenderTransform" Value="scale(0.97)" />
     </Style>
 
     <!-- ================= TARJETA CARPETA (con pestaña) ================= -->

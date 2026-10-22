@@ -135,7 +135,7 @@
                                         BorderBrush="{Binding Borde}" BorderThickness="1,1,1,0"
                                         HorizontalAlignment="Left" VerticalAlignment="Top"
                                         Margin="22,0,0,0"
-                                        RenderTransform="TranslateTransform(0,-9)" />
+                                        RenderTransform="translate(0px, -9px)" />
 
                                 <Border Classes="carpeta" Padding="18,16,18,16">
                                     <Button Classes="tarjeta" Background="Transparent" BorderThickness="0"
