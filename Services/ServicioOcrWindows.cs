@@ -1,37 +1,37 @@
-﻿using Windows.Data.Pdf;
+﻿using System.Text;
+using Windows.Data.Pdf;
+using Windows.Globalization;
 using Windows.Graphics.Imaging;
 using Windows.Media.Ocr;
-using Windows.Storage;
 using Windows.Storage.Streams;
 
 namespace Rpaso.Services;
 
-/// <summary>PÃ¡gina recognised por OCR, con las palabras y su posiciÃ³n.</summary>
+/// <summary>Página reconocida por OCR, con las palabras y su posición.</summary>
 public sealed record PaginaOcr(IReadOnlyList<PalabraTexto> Palabras, double Ancho, double Alto);
 
 /// <summary>
-/// Reconocimiento Ã³ptico de caracteres para PDF escaneados.
+/// Reconocimiento óptico de caracteres para PDF escaneados.
 /// </summary>
 public interface IServicioOcr
 {
     /// <summary>True si hay un motor de OCR disponible en el sistema.</summary>
     bool Disponible { get; }
 
-    /// <summary>Motivo por el que no se puede usar el OCR, o null si estÃ¡ disponible.</summary>
+    /// <summary>Motivo por el que no se puede usar el OCR, o null si está disponible.</summary>
     string? MotivoIndisponible { get; }
 
-    /// <summary>Renderiza las pÃ¡ginas del PDF y devuelve el texto con sus coordenadas.</summary>
+    /// <summary>Renderiza las páginas del PDF y devuelve el texto con sus coordenadas.</summary>
     Task<IReadOnlyList<PaginaOcr>> ReconocerAsync(string rutaPdf, CancellationToken ct = default);
 }
 
 /// <summary>
 /// OCR con las APIs de Windows (Windows.Data.Pdf + Windows.Media.Ocr).
-/// No aÃ±ade ningÃºn peso al ejecutable: ya viene en Windows.
 /// </summary>
 public sealed class ServicioOcrWindows : IServicioOcr
 {
-    /// <summary>Ancho en pÃ­xeles al que se renderiza la pÃ¡gina. MÃ¡s pÃ­xeles = mejor OCR.</summary>
-    private const int AnchoRender = 2000;
+    /// <summary>Ancho en píxeles (~300 DPI para A4). Evita que el OCR confunda 'l' con '1' o pierda puntos.</summary>
+    private const int AnchoRender = 2400;
 
     public bool Disponible { get; }
 
@@ -41,13 +41,13 @@ public sealed class ServicioOcrWindows : IServicioOcr
     {
         try
         {
-            var motor = OcrEngine.TryCreateFromUserProfileLanguages();
+            var motor = CrearMotorPreferente();
 
             if (motor is null)
             {
                 MotivoIndisponible =
-                    "Windows no tiene ningÃºn motor de OCR para los idiomas del sistema. "
-                    + "Instala el paquete de idioma en ConfiguraciÃ³n > Hora e idioma > Idioma y regiÃ³n.";
+                    "Windows no tiene ningún motor de OCR para español ni para los idiomas del sistema. "
+                    + "Instala el paquete de idioma Español en Configuración > Hora e idioma > Idioma y región.";
             }
             else
             {
@@ -60,15 +60,35 @@ public sealed class ServicioOcrWindows : IServicioOcr
         }
     }
 
+    private static OcrEngine? CrearMotorPreferente()
+    {
+        // Priorizar español explícitamente para garantizar reconocimiento de ñ, tildes y signos ¿?
+        string[] idiomasPreferidos = ["es-ES", "es-MX", "es"];
+
+        foreach (var codigo in idiomasPreferidos)
+        {
+            try
+            {
+                var lang = new Language(codigo);
+                if (OcrEngine.IsLanguageSupported(lang))
+                    return OcrEngine.TryCreateFromLanguage(lang);
+            }
+            catch
+            {
+                // Ignorar si el código de cultura falla en una versión específica de Windows
+            }
+        }
+
+        return OcrEngine.TryCreateFromUserProfileLanguages();
+    }
+
     public async Task<IReadOnlyList<PaginaOcr>> ReconocerAsync(string rutaPdf, CancellationToken ct = default)
     {
-        var motor = OcrEngine.TryCreateFromUserProfileLanguages()
+        var motor = CrearMotorPreferente()
             ?? throw new InvalidOperationException(MotivoIndisponible ?? "No hay motor de OCR disponible.");
 
         var paginas = new List<PaginaOcr>();
 
-        // Se usa el Stream de .NET en vez de StorageFile: en aplicaciones de escritorio
-        // sin empaquetar, GetFileFromPathAsync falla con rutas locales.
         using var archivo = File.OpenRead(rutaPdf);
         using var flujo = archivo.AsRandomAccessStream();
 
@@ -78,73 +98,75 @@ public sealed class ServicioOcrWindows : IServicioOcr
         {
             ct.ThrowIfCancellationRequested();
 
-            var pagina = pdf.GetPage(i);
+            using var pagina = pdf.GetPage(i);
 
-            try
+            var anchoPuntos = pagina.Size.Width;
+            var altoPuntos = pagina.Size.Height;
+
+            var factorEscala = anchoPuntos > 0 ? AnchoRender / anchoPuntos : 2.5;
+            var anchoDestino = (int)Math.Min(AnchoRender, OcrEngine.MaxImageDimension);
+            var altoDestino = (int)Math.Min(altoPuntos * factorEscala, OcrEngine.MaxImageDimension);
+
+            // Si la página es muy alta y toca el techo de MaxImageDimension, reajustamos el ancho proporcionalmente
+            if (altoPuntos > 0 && altoDestino < altoPuntos * factorEscala)
             {
-                var anchoPuntos = pagina.Size.Width;
-                var altoPuntos = pagina.Size.Height;
-
-                var anchoDestino = Math.Min(AnchoRender, (int)OcrEngine.MaxImageDimension);
-
-                using var stream = new InMemoryRandomAccessStream();
-
-                await pagina.RenderToStreamAsync(stream, new PdfPageRenderOptions
-                {
-                    DestinationWidth = (uint)anchoDestino
-                });
-
-                stream.Seek(0);
-
-                var decodificador = await BitmapDecoder.CreateAsync(stream);
-
-                var bitmap = await decodificador.GetSoftwareBitmapAsync(
-                    BitmapPixelFormat.Bgra8, BitmapAlphaMode.Premultiplied);
-
-                using (bitmap)
-                {
-                    var escala = anchoPuntos > 0 ? anchoDestino / anchoPuntos : 1;
-                    paginas.Add(ReconocerPagina(motor, bitmap, anchoPuntos, altoPuntos, escala));
-                }
+                anchoDestino = (int)Math.Max(1, anchoPuntos * (altoDestino / altoPuntos));
             }
-            finally
+
+            using var stream = new InMemoryRandomAccessStream();
+
+            await pagina.RenderToStreamAsync(stream, new PdfPageRenderOptions
             {
-                pagina.Dispose();
-            }
+                DestinationWidth = (uint)Math.Max(1, anchoDestino),
+                DestinationHeight = (uint)Math.Max(1, altoDestino)
+            });
+
+            stream.Seek(0);
+
+            var decodificador = await BitmapDecoder.CreateAsync(stream);
+
+            using var bitmap = await decodificador.GetSoftwareBitmapAsync(
+                BitmapPixelFormat.Bgra8, BitmapAlphaMode.Premultiplied);
+
+            var escalaX = anchoPuntos > 0 ? bitmap.PixelWidth / anchoPuntos : 1.0;
+            var escalaY = altoPuntos > 0 ? bitmap.PixelHeight / altoPuntos : 1.0;
+
+            var paginaReconocida = await ReconocerPaginaAsync(motor, bitmap, anchoPuntos, altoPuntos, escalaX, escalaY);
+            paginas.Add(paginaReconocida);
         }
 
         return paginas;
     }
 
-    /// <summary>
-    /// Reconoce una pÃ¡gina ya renderizada y devuelve sus palabras con la posiciÃ³n convertida
-    /// a puntos del PDF (Y hacia arriba, como en PdfPig).
-    /// </summary>
-    private static PaginaOcr ReconocerPagina(
+    private static async Task<PaginaOcr> ReconocerPaginaAsync(
         OcrEngine motor,
         SoftwareBitmap bitmap,
         double anchoPuntos,
         double altoPuntos,
-        double escala)
+        double escalaX,
+        double escalaY)
     {
-        var resultado = motor.RecognizeAsync(bitmap).AsTask().GetAwaiter().GetResult();
-
+        var resultado = await motor.RecognizeAsync(bitmap);
         var palabras = new List<PalabraTexto>();
 
         foreach (var linea in resultado.Lines)
         {
             foreach (var palabra in linea.Words)
             {
+                var textoLimpio = palabra.Text.Normalize(NormalizationForm.FormC).Trim();
+                if (string.IsNullOrWhiteSpace(textoLimpio))
+                    continue;
+
                 var rect = palabra.BoundingRect;
 
                 // El OCR mide Y hacia abajo; el PDF, hacia arriba.
-                var superior = altoPuntos - (rect.Y / escala);
-                var inferior = altoPuntos - ((rect.Y + rect.Height) / escala);
+                var superior = altoPuntos - (rect.Y / escalaY);
+                var inferior = altoPuntos - ((rect.Y + rect.Height) / escalaY);
 
                 palabras.Add(new PalabraTexto(
-                    palabra.Text,
-                    rect.X / escala,
-                    (rect.X + rect.Width) / escala,
+                    textoLimpio,
+                    rect.X / escalaX,
+                    (rect.X + rect.Width) / escalaX,
                     superior,
                     inferior));
             }

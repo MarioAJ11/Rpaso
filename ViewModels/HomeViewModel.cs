@@ -1,11 +1,12 @@
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
 namespace Rpaso.ViewModels;
 
 /// <summary>
-/// Vista de inicio: métricas globales y rejilla de carpetas.
+/// Vista de inicio: lista de carpetas y acciones de estudio.
 /// </summary>
-public sealed class HomeViewModel : ViewModelBase
+public sealed partial class HomeViewModel : ViewModelBase
 {
     private readonly MainViewModel _principal;
 
@@ -31,7 +32,6 @@ public sealed class HomeViewModel : ViewModelBase
                     break;
                 case nameof(MainViewModel.Carpetas):
                     OnPropertyChanged(nameof(Carpetas));
-                    OnPropertyChanged(nameof(TextoCarpetas));
                     break;
             }
         };
@@ -47,19 +47,31 @@ public sealed class HomeViewModel : ViewModelBase
 
     public bool HayFalladas => _principal.TotalFalladas > 0;
 
-    public string TextoCarpetas => Carpetas.Count == 1 ? "1 carpeta activa" : $"{Carpetas.Count} carpetas activas";
-
     public IRelayCommand AbrirCarpetaCommand => _principal.AbrirCarpetaCommand;
 
-    public IRelayCommand ImportarPdfCommand => _principal.ImportarPdfCommand;
-
     public IRelayCommand AbrirModalCarpetaCommand => _principal.AbrirModalCarpetaCommand;
-
-    public IRelayCommand RenombrarCarpetaCommand => _principal.RenombrarCarpetaCommand;
-
-    public IRelayCommand EliminarCarpetaCommand => _principal.EliminarCarpetaCommand;
 
     public IRelayCommand PracticarCarpetaCommand => _principal.PracticarCarpetaCommand;
 
     public IRelayCommand PracticarCarpetaFalladasCommand => _principal.PracticarCarpetaFalladasCommand;
+
+    /// <summary>Edita la carpeta seleccionada.</summary>
+    [RelayCommand]
+    private void EditarCarpeta(CarpetaViewModel? carpeta)
+    {
+        if (carpeta is null)
+            return;
+
+        _principal.EditarCarpetaCommand.Execute(carpeta);
+    }
+
+    /// <summary>Elimina la carpeta seleccionada.</summary>
+    [RelayCommand]
+    private void EliminarCarpeta(CarpetaViewModel? carpeta)
+    {
+        if (carpeta is null)
+            return;
+
+        _principal.EliminarCarpetaCommand.Execute(carpeta);
+    }
 }

@@ -10,15 +10,17 @@ namespace Rpaso.Services;
 /// <param name="Exito">True si se ha importado con preguntas.</param>
 /// <param name="TotalPreguntas">Número de preguntas extraídas (0 si falló).</param>
 /// <param name="MensajeError">Motivo del fallo, o null si salió bien.</param>
+/// <param name="TotalDescartadas">Preguntas quitadas por no poder deducir la respuesta correcta.</param>
 public sealed record ResultadoImportacion(
     string RutaArchivo,
     string NombreArchivo,
     bool Exito,
     int TotalPreguntas,
-    string? MensajeError)
+    string? MensajeError,
+    int TotalDescartadas = 0)
 {
-    public static ResultadoImportacion Importado(string ruta, int preguntas)
-        => new(ruta, Path.GetFileName(ruta), true, preguntas, null);
+    public static ResultadoImportacion Importado(string ruta, int preguntas, int descartadas = 0)
+        => new(ruta, Path.GetFileName(ruta), true, preguntas, null, descartadas);
 
     public static ResultadoImportacion Fallido(string ruta, string motivo)
         => new(ruta, Path.GetFileName(ruta), false, 0, motivo);
@@ -45,6 +47,8 @@ public sealed class InformeImportacion
     public int TotalFallidos => Fallidos.Count;
 
     public int TotalPreguntas => Importados.Sum(r => r.TotalPreguntas);
+
+    public int TotalDescartadas => Importados.Sum(r => r.TotalDescartadas);
 
     public bool HayFallos => TotalFallidos > 0;
 }

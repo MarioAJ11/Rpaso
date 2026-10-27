@@ -12,6 +12,7 @@ public sealed class ResultadoImportacionViewModel : ViewModelBase
         NombreArchivo = resultado.NombreArchivo;
         Exito = resultado.Exito;
         TotalPreguntas = resultado.TotalPreguntas;
+        TotalDescartadas = resultado.TotalDescartadas;
         MensajeError = resultado.MensajeError;
     }
 
@@ -21,10 +22,15 @@ public sealed class ResultadoImportacionViewModel : ViewModelBase
 
     public int TotalPreguntas { get; }
 
+    public int TotalDescartadas { get; }
+
     public string? MensajeError { get; }
 
     public string Detalle => Exito
         ? $"{TotalPreguntas} {(TotalPreguntas == 1 ? "pregunta" : "preguntas")}"
+            + (TotalDescartadas > 0
+                ? $" · {TotalDescartadas} {(TotalDescartadas == 1 ? "descartada" : "descartadas")}"
+                : string.Empty)
         : MensajeError ?? "Error desconocido";
 }
 
@@ -40,6 +46,7 @@ public sealed class InformeImportacionViewModel : ViewModelBase
         TotalImportados = informe.TotalImportados;
         TotalFallidos = informe.TotalFallidos;
         TotalPreguntas = informe.TotalPreguntas;
+        TotalDescartadas = informe.TotalDescartadas;
 
         CerrarCommand = new RelayCommand(cerrar);
     }
@@ -54,6 +61,8 @@ public sealed class InformeImportacionViewModel : ViewModelBase
 
     public int TotalPreguntas { get; }
 
+    public int TotalDescartadas { get; }
+
     public bool HayFallidos => TotalFallidos > 0;
 
     public bool HayImportados => TotalImportados > 0;
@@ -64,7 +73,8 @@ public sealed class InformeImportacionViewModel : ViewModelBase
 
     public string Resumen => $"{(TotalImportados == 1 ? "1 examen importado" : $"{TotalImportados} exámenes importados")}"
         + (TotalFallidos > 0 ? $" · {TotalFallidos} fallidos" : string.Empty)
-        + (TotalPreguntas > 0 ? $" · {TotalPreguntas} preguntas" : string.Empty);
+        + (TotalPreguntas > 0 ? $" · {TotalPreguntas} preguntas" : string.Empty)
+        + (TotalDescartadas > 0 ? $" · {TotalDescartadas} descartadas" : string.Empty);
 
     public RelayCommand CerrarCommand { get; }
 }

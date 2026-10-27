@@ -4,6 +4,8 @@
     <!-- ================= PALETA ================= -->
     <SolidColorBrush x:Key="BrushPrimario" Color="#5C54E5" />
     <SolidColorBrush x:Key="BrushPrimarioOscuro" Color="#5048D4" />
+    <SolidColorBrush x:Key="BrushPrimarioPulsado" Color="#4038B8" />
+    <SolidColorBrush x:Key="BrushPrimarioDeshabilitado" Color="#625CB4" />
     <SolidColorBrush x:Key="BrushPrimarioSuave" Color="#F5F3FF" />
     <SolidColorBrush x:Key="BrushPrimarioBorde" Color="#DDD9FA" />
 
@@ -13,7 +15,8 @@
     <SolidColorBrush x:Key="BrushBordeSuave" Color="#F1F5F9" />
     <SolidColorBrush x:Key="BrushFondoTenue" Color="#F8FAFC" />
 
-    <SolidColorBrush x:Key="BrushTexto" Color="#0F172A" />
+    <SolidColorBrush x:Key="BrushTexto" Color="#1E293B" />
+    <SolidColorBrush x:Key="BrushTextoEditable" Color="#334155" />
     <SolidColorBrush x:Key="BrushTextoSecundario" Color="#64748B" />
     <SolidColorBrush x:Key="BrushTextoTerciario" Color="#94A3B8" />
 

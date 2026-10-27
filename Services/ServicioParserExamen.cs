@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 using Rpaso.Models;
@@ -9,114 +9,172 @@ using UglyToad.PdfPig.DocumentLayoutAnalysis.WordExtractor;
 namespace Rpaso.Services;
 
 /// <summary>
-/// Parser geométrico de exámenes.
+/// Parser geométrico de exámenes (PDF nativo + OCR híbrido).
 /// </summary>
-/// <remarks>
-/// <para>
-/// Trabaja con las coordenadas del texto en lugar de con su cadena, que es lo que permite
-/// descartar la publicidad de los pies de página y reconstruir las líneas correctamente.
-/// </para>
-/// <para>
-/// El eje Y de PDF crece hacia arriba: el margen inferior de la página son las Y pequeñas.
-/// </para>
-/// </remarks>
 public sealed class ServicioParserExamen : IServicioParserExamen
 {
-    /// <summary>Fracción de la altura de página que se descarta por arriba (marca de agua, cabeceras).</summary>
     private const double MargenSuperior = 0.045;
-
-    /// <summary>Fracción de la altura de página que se descarta por abajo (publicidad, avisos legales).</summary>
     private const double MargenInferior = 0.055;
-
-    /// <summary>Tolerancia horizontal para considerar que dos elementos están alineados.</summary>
-    private const double ToleranciaHorizontal = 3.0;
-
-    /// <summary>
-    /// Margen horizontal máximo (en puntos) para que una línea sea continuación de la anterior.
-    /// Cubre el sangrado colgante típico de las PDFs de campus virtual.
-    /// </summary>
-    private const double VentanaContinuacion = 80;
+    private const double ToleranciaHorizontal = 3.5;
+    private const double VentanaContinuacion = 85;
 
     /// <summary>
-    /// Etiqueta de opción: "a)", "b.", "c:", "d -". Se admite una viñeta delante
-    /// ("• a) texto"), habitual en los PDF de exams.
+    /// Etiqueta de opción: soporta "a)", "b.", "c:", "d -", "(a)", "[b]", "a.-" y asterisco de correcta "*a)".
     /// </summary>
     private static readonly Regex PatronEtiqueta = new(
-        @"^\s*[•·▪◦●*]?\s*(?<letra>[a-eA-E])\s*[\)\.\:\-]\s*(?<texto>.+)$",
-        RegexOptions.Compiled);
-
-    /// <summary>Número de pregunta: "1.", "12)", "3 -".</summary>
-    private static readonly Regex PatronNumero = new(
-        @"^\s*[•·▪◦●*]?\s*(?<numero>\d{1,3})\s*[\)\.\:\-]\s*(?<texto>.+)$",
+        @"^\s*[•·▪◦●]?\s*(?<asterisco>\*)?\s*[\(\[]?(?<letra>[a-eA-E])[\)\]\.\:\-]+(?:\s*[\.\-])?\s*(?<texto>.+)$",
         RegexOptions.Compiled);
 
     /// <summary>
-    /// Par clave de respuestas: "1-b", "2. c", "3) d". La letra no puede ir seguida de ")"
-    /// porque eso sería una etiqueta de opción, no una clave.
+    /// Detecta si en una misma línea vienen varias opciones seguidas: "a) Sí   b) No".
     /// </summary>
+    private static readonly Regex PatronOpcionesMultiplesEnLinea = new(
+        @"(?<=\s{2,})(?=[•·▪◦●*]?\s*[\(\[]?[a-eA-E][\)\]\.\:\-]+\s+\S)",
+        RegexOptions.Compiled);
+
+    /// <summary>
+    /// Número de pregunta: "1.", "12)", "3 -", "1.-", "Pregunta 4: Texto", e incluso fallos OCR al inicio como "l)" o "I.".
+    /// </summary>
+    private static readonly Regex PatronNumero = new(
+        @"^\s*[•·▪◦●*]?\s*(?:Pregunta\s+|Question\s+)?(?<numero>\d{1,3}|[lI])\s*[\)\.\:\-]+(?:\s*[\.\-])?\s*(?<texto>.+)$",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    /// <summary>Par clave de respuestas: "1-b", "2. c", "3) d", "4:a".</summary>
     private static readonly Regex PatronClave = new(
-        @"(?<numero>\d{1,3})\s*[\)\.\:\-]\s*(?<letra>[a-eA-E])(?![a-zA-Záéíóúñ\)])",
+        @"\b(?<numero>\d{1,3})\s*[\)\.\:\-]\s*(?<letra>[a-eA-E])(?![a-zA-ZáéíóúñÁÉÍÓÚÑ\)])",
         RegexOptions.Compiled);
 
     /// <summary>Palabras que delatan una línea de clave de respuestas.</summary>
     private static readonly Regex PatronPalabraClave = new(
-        @"(?i)\b(respuestas?|soluciones?|clave)\b",
+        @"(?i)^\s*(respuestas?|soluciones?|claves?|plantilla)\b",
         RegexOptions.Compiled);
 
-    /// <summary>Encabezado de bloque: "Pregunta 1", "Question 2". No es una pregunta.</summary>
-    private static readonly Regex PatronEncabezado = new(
-        @"^\s*(Pregunta|Question)\s*\d{1,3}\s*[:.]?\s*$",
+    /// <summary>
+    /// Línea explícita de retroalimentación de Campus Virtual / Moodle:
+    /// "La respuesta correcta es: b) Texto" o "Respuesta correcta: La opción A".
+    /// </summary>
+    private static readonly Regex PatronRetroalimentacionRespuesta = new(
+        @"^\s*(?:La\s+)?respuesta\s+correcta\s+(?:es\s*)?[:\-]?\s*(?<contenido>.+)$",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
-    /// <summary>
-    /// Marca que aparece en el margen derecho de la opción correcta: "Respuesta correcta".
-    /// </summary>
-    private static readonly Regex PatronMarcaRespuesta = new(
-        @"(?i)\bRespuesta\s+correcta\b",
+    /// <summary>Encabezado o metadato de bloque de Campus Virtual / Wuolah.</summary>
+    private static readonly Regex PatronEncabezado = new(
+        @"^\s*(?:(?:Pregunta|Question)\s*\d{1,3}\s*[:.]?|Seleccione\s+una(?:\s+o\s+m[aá]s\s+de\s+una)?\s*:?|Se\s+punt[uú]a\s+[\d,.]+\s+sobre\s+[\d,.]+|Punt[uú]a\s+como\s+[\d,.]+|Marcar\s+pregunta|Texto\s+de\s+la\s+pregunta|P[aá]gina\s+\d+(?:\s+de\s+\d+)?|Reservados\s+todos\s+los\s+derechos.*|Descargado\s+por\s+.*|Wuolah\s+Free.*)\s*$",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    /// <summary>Estado de la pregunta en un test ya corregido.</summary>
+    private static readonly Regex PatronEstado = new(
+        @"^\s*(INCORRECT[OA]|CORRECT[OA]|Acierto|Fallo|Sin\s+contestar|Parcialmente\s+correct[oa]|Finalizado)\s*$",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    private static readonly Regex PatronEtiquetaEstadoExamen = new(
+        @"(?i)^\s*(?:opci[oó]n\s+m[uú]ltiple|calificaci[oó]n\s+final|formativa|correct[oa]|incorrect[oa]|acierto|fallo|sin\s+contestar|finalizado)\s*$");
+
+    private static readonly Regex PatronNumeroCabeceraCorregida = new(
+        @"^\s*(?<numero>\d{1,3})\s+",
         RegexOptions.Compiled);
 
-    /// <summary>
-    /// Ruido que el OCR deja pegado al texto de las opciones: marcas de veredicto
-    /// sueltas y metadatos de cabecera (ENVIADO, fechas, identificadores hex).
-    /// </summary>
+    private static readonly Regex PatronMetadatoCabeceraCorregida = new(
+        @"(?i)^\s*(?:opci[oó]n\s+m[uú]ltiple|calificaci[oó]n\s+final|formativa|correct[oa]|incorrect[oa]|acierto|fallo|sin\s+contestar|finalizado)\b\s*",
+        RegexOptions.Compiled);
+
+    private static readonly Regex PatronPuntuacionCabeceraCorregida = new(
+        @"(?i)^\s*(?:(?:[0o]\s*)?/\s*\d+(?:[,.]\d+)?|\d+(?:[,.]\d+)?\s*/\s*\d+(?:[,.]\d+)?)\s+",
+        RegexOptions.Compiled);
+
+    /// <summary>Puntuación de una pregunta corregida: "0/ 2,5", "2,5 / 2,5".</summary>
+    private static readonly Regex PatronPuntuacion = new(
+        @"^\s*\d+(?:[.,]\d+)?\s*/\s*\d+(?:[.,]\d+)?\s*$",
+        RegexOptions.Compiled);
+
+    /// <summary>Marca que aparece en el margen derecho de la opción correcta: "Respuesta correcta" o "✓".</summary>
+    private static readonly Regex PatronMarcaRespuesta = new(
+        @"(?i)(\bRespuesta\s+correcta\b|[✓✔☑])",
+        RegexOptions.Compiled);
+
+    /// <summary>Ruido que el OCR deja pegado al texto.</summary>
     private static readonly Regex PatronRuidoOcr = new(
-        @"(?i)\b(correcta|incorrecta|respuesta|enviado|confirmaci[oó]n)\b|"
+        @"(?i)\b(enviado|confirmaci[oó]n)\b|"
         + @"[0-9]{1,2}/[0-9]{1,2}/[0-9]{2,4}|"
         + @"[0-9]{1,2}:[0-9]{2}(:[0-9]{2})?|"
         + @"[*][0-9A-Fa-f]{8,}",
         RegexOptions.Compiled);
 
-    /// <summary>
-    /// Prefijo que el PDF pone delante de la opción: "Correcta:" o "Incorrecta:".
-    /// </summary>
+    /// <summary>Prefijo que el PDF pone delante de la opción: "Correcta:" o "Incorrecta:".</summary>
     private static readonly Regex PatronPrefijoVeredicto = new(
-        @"^\s*(?<veredicto>Correcta|Incorrecta)\s*:\s*",
+        @"^\s*(?<veredicto>Correct[oa]|Incorrect[oa])\s*:\s*",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
-    /// <summary>Botón de radio: relleno indica lo que eligió el alumno, no la respuesta correcta.</summary>
+    /// <summary>Botón de radio o casilla al inicio de la opción.</summary>
     private static readonly Regex PatronRadio = new(
-        @"^\s*[○◉●⦿⭘◯⭑•]\s*",
+        @"^\s*[○◉●⦿⭘◯⭑•☐☒]\s*",
         RegexOptions.Compiled);
 
     /// <summary>La línea termina con la etiqueta de veredicto: "Correcta:" / "Incorrecta:".</summary>
     private static readonly Regex PatronVeredictoFinal = new(
-        @"(?i)\b(correcta|incorrecta)\s*:\s*$",
+        @"(?i)\b(correct[oa]|incorrect[oa])\s*:\s*$",
         RegexOptions.Compiled);
 
-    /// <summary>Nombres de archivo: sueles ser la portada del PDF, no una pregunta.</summary>
+    /// <summary>Nombres de archivo en portadas.</summary>
     private static readonly Regex PatronArchivo = new(
         @"\.(pdf|docx?|txt|png|jpe?g|odt|zip|xlsx?|pptx?)$",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     private readonly IServicioOcr? _ocr;
 
-    /// <param name="ocr">
-    /// Servicio de OCR opcional. Si el PDF no tiene capa de texto, se usa para leerlo
-    /// por imagen (PDF escaneados).
-    /// </param>
     public ServicioParserExamen(IServicioOcr? ocr = null)
     {
         _ocr = ocr;
+    }
+
+    public IReadOnlyList<(double BaseLinea, double Izquierda, double XContenido, string Texto, string Tipo, string? Letra, bool Negrita)>
+        DiagnosticarPagina(string rutaPdf, int numeroPagina)
+    {
+        if (numeroPagina < 1)
+            throw new ArgumentOutOfRangeException(nameof(numeroPagina), "El número de página debe ser mayor que cero.");
+
+        using var documento = PdfDocument.Open(rutaPdf);
+        if (numeroPagina > documento.NumberOfPages)
+            throw new ArgumentOutOfRangeException(nameof(numeroPagina), "El PDF no contiene esa página.");
+
+        var lineas = ReconstruirLineas(documento.GetPage(numeroPagina));
+        return ClasificarLineas(lineas, new EstadoClasificacion())
+            .Select(clasificada => (
+                clasificada.Linea.Base,
+                clasificada.Linea.Izquierda,
+                clasificada.Linea.XContenido,
+                clasificada.Linea.Texto,
+                clasificada.Tipo.ToString(),
+                clasificada.Letra,
+                clasificada.Linea.Negrita))
+            .ToList();
+    }
+
+    public async Task<IReadOnlyList<(double BaseLinea, double Izquierda, double XContenido, string Texto, string Tipo, string? Letra, bool Negrita, bool Resaltada)>>
+        DiagnosticarOcrAsync(string rutaPdf, int numeroPagina, CancellationToken ct = default)
+    {
+        if (numeroPagina < 1)
+            throw new ArgumentOutOfRangeException(nameof(numeroPagina), "El número de página debe ser mayor que cero.");
+        if (_ocr is not { Disponible: true })
+            throw new InvalidOperationException(_ocr?.MotivoIndisponible ?? "No se ha configurado un servicio OCR disponible.");
+
+        var paginas = await _ocr.ReconocerAsync(rutaPdf, ct);
+        if (numeroPagina > paginas.Count)
+            throw new ArgumentOutOfRangeException(nameof(numeroPagina), "El PDF no contiene esa página.");
+
+        var pagina = paginas[numeroPagina - 1];
+        var lineas = ReconstruirLineas(pagina.Palabras.ToList(), pagina.Ancho, pagina.Alto);
+        return ClasificarLineas(lineas, new EstadoClasificacion())
+            .Select(clasificada => (
+                clasificada.Linea.Base,
+                clasificada.Linea.Izquierda,
+                clasificada.Linea.XContenido,
+                clasificada.Linea.Texto,
+                clasificada.Tipo.ToString(),
+                clasificada.Letra,
+                clasificada.Linea.Negrita,
+                clasificada.Linea.Resaltada))
+            .ToList();
     }
 
     public async Task<AnalisisExamen> AnalizarAsync(string rutaPdf, string carpetaId, CancellationToken ct = default)
@@ -131,7 +189,14 @@ public sealed class ServicioParserExamen : IServicioParserExamen
         var paginasTotales = 0;
         var lineasTotales = 0;
 
-        // PdfPig es síncrono: se ejecuta en un hilo de fondo para no bloquear la interfaz.
+        var fiables = new HashSet<string>(StringComparer.Ordinal);
+        var clasificacion = new EstadoClasificacion();
+        var interpretacion = new EstadoInterpretacion();
+
+        // Guardamos los resaltados vectoriales por página por si el documento es escaneado
+        // pero tiene subrayados digitales en amarillo hechos con un visor de PDF.
+        var resaltadosPorPagina = new List<IReadOnlyList<Resaltado>>();
+
         await Task.Run(() =>
         {
             using var documento = PdfDocument.Open(rutaPdf);
@@ -142,40 +207,86 @@ public sealed class ServicioParserExamen : IServicioParserExamen
 
                 paginasTotales++;
 
-                var lineas = ReconstruirLineas(pagina);
+                var resaltados = ExtraerResaltados(pagina);
+                resaltadosPorPagina.Add(resaltados);
+
+                var lineas = ReconstruirLineas(ExtraerPalabras(pagina), pagina.Width, pagina.Height, resaltados);
 
                 if (lineas.Count > 0)
                     paginasConTexto++;
 
                 lineasTotales += lineas.Count;
-                InterpretarLineas(lineas, preguntas, numeros, claves);
+                InterpretarLineas(lineas, clasificacion, interpretacion, preguntas, numeros, claves, fiables,
+                    unirFragmentosOcr: false);
             }
         }, ct);
 
-        // Sin capa de texto: es un escaneo. Se intenta el OCR.
+        if (interpretacion.Actual is not null)
+        {
+            CerrarPregunta(interpretacion.Actual, preguntas, numeros, fiables, unirFragmentosOcr: false);
+            interpretacion.Actual = null;
+        }
+
+        // Si la capa de texto no produjo ninguna pregunta (ej. era un escaneo o solo tenía
+        // texto vectorial de publicidad de Wuolah en los márgenes), lanzamos el OCR.
         var usoOcr = false;
 
         if (preguntas.Count == 0 && _ocr is { Disponible: true })
         {
+            claves.Clear();
+            numeros.Clear();
+            fiables.Clear();
+            clasificacion = new EstadoClasificacion();
+            interpretacion = new EstadoInterpretacion();
+            paginasConTexto = 0;
+            lineasTotales = 0;
+
             var paginasOcr = await _ocr.ReconocerAsync(rutaPdf, ct);
 
-            foreach (var pagina in paginasOcr)
+            for (var i = 0; i < paginasOcr.Count; i++)
             {
                 ct.ThrowIfCancellationRequested();
 
-                var lineas = ReconstruirLineas(pagina.Palabras.ToList(), pagina.Ancho, pagina.Alto);
+                var pagina = paginasOcr[i];
+                var resaltados = i < resaltadosPorPagina.Count ? resaltadosPorPagina[i] : null;
+
+                var lineas = ReconstruirLineas(pagina.Palabras.ToList(), pagina.Ancho, pagina.Alto, resaltados);
 
                 if (lineas.Count > 0)
                     paginasConTexto++;
 
                 lineasTotales += lineas.Count;
-                InterpretarLineas(lineas, preguntas, numeros, claves);
+                InterpretarLineas(lineas, clasificacion, interpretacion, preguntas, numeros, claves, fiables,
+                    unirFragmentosOcr: true);
+            }
+
+            if (interpretacion.Actual is not null)
+            {
+                CerrarPregunta(interpretacion.Actual, preguntas, numeros, fiables, unirFragmentosOcr: true);
+                interpretacion.Actual = null;
             }
 
             usoOcr = paginasOcr.Count > 0;
         }
 
-        AplicarClaves(preguntas, numeros, claves);
+        AplicarClaves(preguntas, numeros, claves, fiables);
+
+        var descartadas = 0;
+
+        if (fiables.Count < preguntas.Count)
+        {
+            var conservadas = new List<Pregunta>(preguntas.Count);
+
+            foreach (var pregunta in preguntas)
+            {
+                if (fiables.Contains(pregunta.Id))
+                    conservadas.Add(pregunta);
+                else
+                    descartadas++;
+            }
+
+            preguntas = conservadas;
+        }
 
         var test = new Test(
             Id: $"t-{Guid.NewGuid():N}"[..12],
@@ -185,22 +296,26 @@ public sealed class ServicioParserExamen : IServicioParserExamen
             ArchivoOrigen: Path.GetFileName(rutaPdf),
             Preguntas: preguntas);
 
-        var aviso = CalcularAviso(paginasTotales, paginasConTexto, lineasTotales, preguntas.Count);
+        var aviso = CalcularAviso(paginasTotales, paginasConTexto, lineasTotales, preguntas.Count, descartadas);
 
         if (usoOcr && aviso is not null)
             aviso = "El PDF es un escaneo y se ha leído con OCR: " + aviso;
 
-        return new AnalisisExamen(test, aviso);
+        return new AnalisisExamen(test, aviso, descartadas);
     }
 
-    /// <summary>
-    /// Explica por qué un PDF no ha producido preguntas. Se muestra al usuario en el informe
-    /// de importación para que sepa si tiene que corregir el archivo o revisar la app.
-    /// </summary>
-    private static string? CalcularAviso(int paginasTotales, int paginasConTexto, int lineasTotales, int preguntas)
+    private static string? CalcularAviso(
+        int paginasTotales, int paginasConTexto, int lineasTotales, int preguntas, int descartadas)
     {
         if (preguntas > 0)
             return null;
+
+        if (descartadas > 0)
+        {
+            return descartadas == 1
+                ? "Se ha descartado 1 pregunta porque el PDF no indica cuál es la respuesta correcta."
+                : $"Se han descartado {descartadas} preguntas porque el PDF no indica cuál es la respuesta correcta.";
+        }
 
         if (paginasTotales == 0)
             return "El PDF no tiene páginas.";
@@ -227,32 +342,51 @@ public sealed class ServicioParserExamen : IServicioParserExamen
         public required double Alto { get; init; }
         public Match? Etiqueta { get; set; }
         public Match? Numero { get; set; }
-
-        /// <summary>
-        /// X donde empieza el contenido de la línea. En una opción es el texto que va
-        /// detrás de la etiqueta ("• a) texto"): la etiqueta y el texto no comparten la X.
-        /// Sirve para alinear la continuación de una opción con su texto.
-        /// </summary>
         public double XContenido { get; set; }
 
-        /// <summary>True si la línea contiene la marca "Respuesta correcta".</summary>
         public bool ContieneMarcaRespuesta => PatronMarcaRespuesta.IsMatch(Texto);
+        public bool Resaltada { get; set; }
+        public bool MarcaCorrecta { get; set; }
+
+        public double Superior => Palabras.Count == 0 ? Base : Palabras.Max(p => p.Superior);
+        public double Inferior => Palabras.Count == 0 ? Base : Palabras.Min(p => p.Inferior);
+        public double Derecha => Palabras.Count == 0 ? Izquierda : Palabras.Max(p => p.Derecha);
 
         /// <summary>
-        /// True si alguna palabra de la línea está en negrita. En estos tests la opción
-        /// correcta es la única en negrita.
+        /// True si el cuerpo de la línea (ignorando la etiqueta inicial "a)", "1.") está mayoritariamente
+        /// en negrita. Evita falsos positivos cuando el PDF pone las letras "a)", "b)" en negrita en todas las opciones.
         /// </summary>
-        /// <remarks>
-        /// Se usa <c>FontDetails.IsBold</c> y no el nombre de la fuente: el prefijo de
-        /// subconjunto ("DAAAAA+Times") es asignado por orden de aparición y no dice nada
-        /// sobre si la fuente es negrita ("Times" puede ser Roman o Bold).
-        /// </remarks>
-        public bool Negrita => Palabras.Any(p => p.Negrita);
+        public bool Negrita
+        {
+            get
+            {
+                if (Palabras.Count == 0)
+                    return false;
+
+                var inicio = 0;
+                if (Etiqueta is { Success: true } && Palabras.Count > 1)
+                {
+                    inicio = 1;
+                    while (inicio < Palabras.Count - 1 && EsSoloSeparador(Palabras[inicio].Texto))
+                        inicio++;
+                }
+
+                var totalCuerpo = Palabras.Count - inicio;
+                if (totalCuerpo <= 0)
+                    return Palabras[0].Negrita;
+
+                var negritasCuerpo = 0;
+                for (var i = inicio; i < Palabras.Count; i++)
+                {
+                    if (Palabras[i].Negrita)
+                        negritasCuerpo++;
+                }
+
+                return (double)negritasCuerpo / totalCuerpo >= 0.6;
+            }
+        }
     }
 
-    /// <summary>
-    /// Extrae las palabras del PDF con su posición.
-    /// </summary>
     private static List<PalabraTexto> ExtraerPalabras(Page pagina) =>
         pagina.GetWords(new NearestNeighbourWordExtractor(
             new NearestNeighbourWordExtractor.NearestNeighbourWordExtractorOptions
@@ -262,43 +396,47 @@ public sealed class ServicioParserExamen : IServicioParserExamen
             .Where(p => p.TextOrientation == TextOrientation.Horizontal)
             .Where(p => !string.IsNullOrWhiteSpace(p.Text))
             .Select(p => new PalabraTexto(
-                p.Text,
+                ServicioExtraccionPdf.NormalizarTextoPdf(p.Text),
                 p.BoundingBox.Left,
                 p.BoundingBox.Right,
                 p.BoundingBox.Top,
                 p.BoundingBox.Bottom,
                 EsNegrita(p)))
+            .Where(p => p.Texto.Length > 0)
             .OrderByDescending(p => p.Inferior)
             .ToList();
 
-    /// <summary>
-    /// True si la palabra va en negrita. Se usa <c>FontDetails.IsBold</c> y no el nombre de
-    /// la fuente: el prefijo de subconjunto ("DAAAAA+Times") se asigna por orden de aparición
-    /// y no dice nada sobre si la fuente es negrita ("Times" puede ser Roman o Bold).
-    /// </summary>
-    private static bool EsNegrita(UglyToad.PdfPig.Content.Word palabra)
+    private static bool EsNegrita(Word palabra)
     {
         if (palabra.Letters.Count == 0)
             return false;
 
-        var letra = palabra.Letters[0];
+        // Evaluamos si más de la mitad de las letras de la palabra son negrita
+        var negritas = 0;
+        foreach (var letra in palabra.Letters)
+        {
+            var bold = letra.FontDetails?.IsBold == true
+                || (letra.FontName?.Contains("Bold", StringComparison.OrdinalIgnoreCase) ?? false)
+                || (letra.FontName?.Contains("Heavy", StringComparison.OrdinalIgnoreCase) ?? false)
+                || (letra.FontName?.Contains("Black", StringComparison.OrdinalIgnoreCase) ?? false)
+                || (letra.FontName?.Contains("Medi", StringComparison.OrdinalIgnoreCase) ?? false);
 
-        return letra.FontDetails?.IsBold == true
-            || (letra.FontName?.Contains("Bold", StringComparison.OrdinalIgnoreCase) ?? false)
-            || (letra.FontName?.Contains("Heavy", StringComparison.OrdinalIgnoreCase) ?? false)
-            || (letra.FontName?.Contains("Black", StringComparison.OrdinalIgnoreCase) ?? false);
+            if (bold)
+                negritas++;
+        }
+
+        return negritas * 2 >= palabra.Letters.Count;
     }
 
-    /// <summary>
-    /// Agrupa las palabras en líneas por su línea base (Y) y descarta los márgenes.
-    /// </summary>
     private static List<Linea> ReconstruirLineas(Page pagina)
-        => ReconstruirLineas(ExtraerPalabras(pagina), pagina.Width, pagina.Height);
+        => ReconstruirLineas(
+            ExtraerPalabras(pagina), pagina.Width, pagina.Height, ExtraerResaltados(pagina));
 
-    /// <summary>
-    /// Mismo agrupamiento, pero sobre palabras que ya vienen de otro origen (por ejemplo el OCR).
-    /// </summary>
-    private static List<Linea> ReconstruirLineas(List<PalabraTexto> palabras, double anchoPagina, double altoPagina)
+    private static List<Linea> ReconstruirLineas(
+        List<PalabraTexto> palabras,
+        double anchoPagina,
+        double altoPagina,
+        IReadOnlyList<Resaltado>? resaltados = null)
     {
         var limiteSuperior = altoPagina * (1 - MargenSuperior);
         var limiteInferior = altoPagina * MargenInferior;
@@ -312,78 +450,213 @@ public sealed class ServicioParserExamen : IServicioParserExamen
         if (palabras.Count == 0)
             return [];
 
-        // Altura de letra típica: referencia para las tolerancias.
         var alturas = palabras.Select(p => p.Alto).Where(h => h > 0).Order().ToList();
         var altoMedio = alturas.Count > 0 ? alturas[alturas.Count / 2] : 8;
 
-        // Dos palabras están en la misma línea si su línea base coincide (± tolerancia).
-        var toleranciaLinea = Math.Max(1.5, altoMedio * 0.4);
+        var toleranciaLinea = Math.Max(2.2, altoMedio * 0.55);
+        var huecoMaximo = Math.Max(55, anchoPagina * 0.10);
 
-        // Un hueco horizontal enorme significa otro bloque de texto (por ejemplo una nota
-        // en el margen derecho). A partir de ahí, son líneas distintas.
-        var huecoMaximo = Math.Max(50, anchoPagina * 0.10);
-
-        var lineas = new List<Linea>();
+        var bandas = new List<List<PalabraTexto>>();
+        var basesBanda = new List<double>();
 
         foreach (var palabra in palabras)
         {
-            var basePalabra = palabra.Inferior;
+            var indice = -1;
+            var mejorDiferencia = double.MaxValue;
 
-            // Entre las líneas con la misma base base, se sigue la que está más cerca
-            // horizontalmente: así una nota del margen derecho no se pega a la opción.
-            Linea? linea = null;
-            var mejorHueco = double.MaxValue;
-
-            foreach (var candidata in lineas.Where(l => Math.Abs(l.Base - basePalabra) <= toleranciaLinea))
+            for (var i = 0; i < bandas.Count; i++)
             {
-                var hueco = candidata.Palabras.Count == 0
-                    ? 0
-                    : palabra.Izquierda - candidata.Palabras[^1].Derecha;
+                var diferencia = Math.Abs(basesBanda[i] - palabra.Inferior);
 
-                if (hueco < mejorHueco)
+                if (diferencia <= toleranciaLinea && diferencia < mejorDiferencia)
                 {
-                    mejorHueco = hueco;
-                    linea = candidata;
+                    mejorDiferencia = diferencia;
+                    indice = i;
                 }
             }
 
-            if (linea is not null && mejorHueco > huecoMaximo)
-                linea = null;
-
-            if (linea is null)
+            if (indice < 0)
             {
-                linea = new Linea
+                bandas.Add([palabra]);
+                basesBanda.Add(palabra.Inferior);
+            }
+            else
+            {
+                bandas[indice].Add(palabra);
+                // Actualizar media móvil de la base de la banda para líneas ligeramente inclinadas en OCR
+                basesBanda[indice] = (basesBanda[indice] * (bandas[indice].Count - 1) + palabra.Inferior) / bandas[indice].Count;
+            }
+        }
+
+        var lineas = new List<Linea>();
+
+        foreach (var banda in bandas)
+        {
+            var ordenadas = banda.OrderBy(p => p.Izquierda).ToList();
+            var palabrasLinea = new List<PalabraTexto>();
+
+            void CerrarLinea()
+            {
+                if (palabrasLinea.Count == 0)
+                    return;
+
+                var baseLinea = palabrasLinea
+                    .Select(p => p.Inferior)
+                    .Order()
+                    .ElementAt(palabrasLinea.Count / 2);
+
+                lineas.Add(new Linea
                 {
-                    Palabras = [],
+                    Palabras = palabrasLinea,
                     Texto = string.Empty,
-                    Base = basePalabra,
-                    Izquierda = palabra.Izquierda,
+                    Base = baseLinea,
+                    Izquierda = palabrasLinea[0].Izquierda,
                     Alto = altoMedio
-                };
-                lineas.Add(linea);
+                });
+
+                palabrasLinea = [];
             }
 
-            linea.Palabras.Add(palabra);
+            foreach (var palabra in ordenadas)
+            {
+                // Cortar línea si hay un gran hueco (nota al margen) o si aparece una nueva opción en horizontal ("a) Sí   b) No")
+                if (palabrasLinea.Count > 0)
+                {
+                    var hueco = palabra.Izquierda - palabrasLinea[^1].Derecha;
+                    var pareceNuevaOpcionEnFila = hueco >= Math.Max(14, altoMedio * 1.5)
+                        && Regex.IsMatch(palabra.Texto, @"^[•·▪◦●*]?\s*[\(\[]?[a-eA-E][\)\]\.\:\-]+$");
+
+                    if (hueco > huecoMaximo || pareceNuevaOpcionEnFila)
+                        CerrarLinea();
+                }
+
+                palabrasLinea.Add(palabra);
+            }
+
+            CerrarLinea();
         }
+
+        var lineasFinales = new List<Linea>(lineas.Count);
 
         foreach (var linea in lineas)
         {
             linea.Palabras.Sort((a, b) => a.Izquierda.CompareTo(b.Izquierda));
             linea.Texto = UnirPalabras(linea.Palabras, altoMedio);
             linea.Izquierda = linea.Palabras[0].Izquierda;
-            linea.Etiqueta = PatronEtiqueta.Match(linea.Texto);
-            linea.Numero = PatronNumero.Match(linea.Texto);
-            linea.XContenido = ObtenerInicioDelContenido(linea) ?? linea.Izquierda;
+
+            if (resaltados is { Count: > 0 })
+                linea.Resaltada = resaltados.Any(r => SeSolapan(linea, r));
+
+            // Si en el texto unido siguen viniendo varias opciones en la misma línea ("a) Opción 1   b) Opción 2"), las desdoblamos
+            var subPartes = PatronOpcionesMultiplesEnLinea.Split(linea.Texto);
+            if (subPartes.Length > 1 && PatronEtiqueta.IsMatch(subPartes[0]))
+            {
+                for (var idx = 0; idx < subPartes.Length; idx++)
+                {
+                    var subTexto = subPartes[idx].Trim();
+                    if (subTexto.Length == 0) continue;
+
+                    var subLinea = new Linea
+                    {
+                        Palabras = linea.Palabras,
+                        Texto = subTexto,
+                        Base = linea.Base - (idx * 0.01), // Mantener orden relativo de lectura
+                        Izquierda = linea.Izquierda,
+                        Alto = linea.Alto,
+                        Resaltada = linea.Resaltada
+                    };
+                    InicializarMetadatosLinea(subLinea);
+                    lineasFinales.Add(subLinea);
+                }
+            }
+            else
+            {
+                InicializarMetadatosLinea(linea);
+                lineasFinales.Add(linea);
+            }
         }
 
-        // La Y de PDF crece hacia arriba: el orden de lectura de la página es de mayor a menor.
-        return lineas.OrderByDescending(l => l.Base).ToList();
+        return lineasFinales
+            .OrderByDescending(l => Math.Round(l.Base, 1))
+            .ThenBy(l => l.Izquierda)
+            .ToList();
     }
 
-    /// <summary>
-    /// Devuelve la X donde empieza el texto de una opción (justo detrás de la etiqueta),
-    /// o null si la línea no lleva etiqueta.
-    /// </summary>
+    private static void InicializarMetadatosLinea(Linea linea)
+    {
+        linea.Etiqueta = PatronEtiqueta.Match(linea.Texto);
+        linea.Numero = PatronNumero.Match(linea.Texto);
+        linea.XContenido = ObtenerInicioDelContenido(linea) ?? linea.Izquierda;
+    }
+
+    private sealed record Resaltado(double Izquierda, double Derecha, double Superior, double Inferior);
+
+    private static List<Resaltado> ExtraerResaltados(Page pagina)
+    {
+        var resaltados = new List<Resaltado>();
+
+        try
+        {
+            foreach (var trazo in pagina.Paths)
+            {
+                if (!trazo.IsFilled || trazo.FillColor is null)
+                    continue;
+
+                var caja = trazo.GetBoundingRectangle();
+                if (caja is null)
+                    continue;
+
+                var rect = caja.Value;
+
+                var izquierda = Math.Min(rect.Left, rect.Right);
+                var derecha = Math.Max(rect.Left, rect.Right);
+                var superior = Math.Max(rect.Top, rect.Bottom);
+                var inferior = Math.Min(rect.Top, rect.Bottom);
+
+                var ancho = derecha - izquierda;
+                var alto = superior - inferior;
+
+                if (ancho < 12 || alto < 4 || alto > 45)
+                    continue;
+
+                var (r, g, b) = trazo.FillColor.ToRGBValues();
+
+                // Acepta amarillo, verde claro, naranja suave o cian de subrayado
+                var esCalidoOVerde = (r >= 0.55 && g >= 0.55 && b <= 0.85) || (g >= 0.65 && g > r * 1.15 && g > b * 1.15);
+                var esMuyClaro = r >= 0.94 && g >= 0.94 && b >= 0.94;
+
+                if (!esCalidoOVerde || esMuyClaro)
+                    continue;
+
+                resaltados.Add(new Resaltado(izquierda, derecha, superior, inferior));
+            }
+        }
+        catch
+        {
+            // Ignorar trazos malformados
+        }
+
+        return resaltados;
+    }
+
+    private static bool SeSolapan(Linea linea, Resaltado resaltado)
+    {
+        var altoLinea = linea.Superior - linea.Inferior;
+        var anchoLinea = linea.Derecha - linea.Izquierda;
+
+        if (altoLinea <= 0 || anchoLinea <= 0)
+            return false;
+
+        var solapeVertical = Math.Min(linea.Superior, resaltado.Superior)
+            - Math.Max(linea.Inferior, resaltado.Inferior);
+
+        var solapeHorizontal = Math.Min(linea.Derecha, resaltado.Derecha)
+            - Math.Max(linea.Izquierda, resaltado.Izquierda);
+
+        return solapeVertical >= altoLinea * 0.35
+            && solapeHorizontal >= Math.Min(anchoLinea * 0.25, 35);
+    }
+
     private static double? ObtenerInicioDelContenido(Linea linea)
     {
         if (linea.Etiqueta is not { Success: true })
@@ -393,12 +666,11 @@ public sealed class ServicioParserExamen : IServicioParserExamen
 
         for (var i = 0; i < linea.Palabras.Count; i++)
         {
-            var palabra = linea.Palabras[i].Texto.TrimStart('•', '·', '▪', '◦', '●', '*');
+            var palabra = linea.Palabras[i].Texto.TrimStart('•', '·', '▪', '◦', '●', '*', '(', '[');
 
             if (!palabra.StartsWith(letra, StringComparison.OrdinalIgnoreCase))
                 continue;
 
-            // La etiqueta puede ser una palabra pegada ("a)") o ir suelta ("A" + ")").
             var siguiente = i + 1;
 
             while (siguiente < linea.Palabras.Count && EsSoloSeparador(linea.Palabras[siguiente].Texto))
@@ -413,38 +685,21 @@ public sealed class ServicioParserExamen : IServicioParserExamen
         return null;
     }
 
-    /// <summary>True si la palabra es solo un separador ("a)", ")", ".", ...).</summary>
     private static bool EsSoloSeparador(string texto)
     {
         var limpia = texto.TrimStart('•', '·', '▪', '◦', '●', '*').Trim();
-
-        return limpia.Length > 0 && limpia.All(c => char.IsPunctuation(c));
+        return limpia.Length > 0 && limpia.All(char.IsPunctuation);
     }
 
-    /// <summary>
-    /// Distancia máxima (en puntos) para considerar que dos letras son la MISMA palabra.
-    /// PdfPig por defecto las une con una tolerancia bastante amplia, y hay PDF que colocan
-    /// las palabras casi pegadas: el resultado son textos como "Enelprocesodepolimerizacion".
-    /// Con 0,5 pt solo se soldan las letras realmente contiguas.
-    /// </summary>
-    private static readonly Func<UglyToad.PdfPig.Content.Letter, UglyToad.PdfPig.Content.Letter, double> DistanciaMaximaPalabra
-        = (_, _) => 0.5;
+    private static readonly Func<Letter, Letter, double> DistanciaMaximaPalabra
+        = (l1, l2) => Math.Max(0.6, Math.Min(l1.PointSize, l2.PointSize) * 0.12);
 
-    /// <summary>
-    /// Une las palabras de una línea. Se mete un espacio si el hueco horizontal entre dos
-    /// palabras es mayor que un mínimo absoluto (0,3 pt) o que una fracción de la altura de letra.
-    /// </summary>
-    /// <remarks>
-    /// El mínimo absoluto importa: hay PDF que colocan las palabras pegadas (con kerning o
-    /// separadores de solo 0,2 pt) y, si se exige una fracción grande de la altura, las palabras
-    /// se quedan soldadas ("Enelprocesode...").
-    /// </remarks>
     private static string UnirPalabras(List<PalabraTexto> palabras, double altoMedio)
     {
         var texto = new StringBuilder();
         PalabraTexto? anterior = null;
 
-        var umbral = Math.Max(0.3, altoMedio * 0.05);
+        var umbral = Math.Max(0.35, altoMedio * 0.06);
 
         foreach (var palabra in palabras)
         {
@@ -452,7 +707,10 @@ public sealed class ServicioParserExamen : IServicioParserExamen
             {
                 var hueco = palabra.Izquierda - anterior.Derecha;
 
-                if (hueco > umbral)
+                // No meter espacio si es un acento desglosado o signo de cierre pegado
+                var esSignoPegado = palabra.Texto is "." or "," or ";" or ":" or ")" or "]" or "?" or "!" or "´" or "¨";
+
+                if (hueco > umbral && !esSignoPegado)
                     texto.Append(' ');
             }
 
@@ -460,7 +718,7 @@ public sealed class ServicioParserExamen : IServicioParserExamen
             anterior = palabra;
         }
 
-        return texto.ToString().Trim();
+        return ServicioExtraccionPdf.NormalizarTextoPdf(texto.ToString());
     }
 
     // ---------------------------------------------------------------------
@@ -473,7 +731,8 @@ public sealed class ServicioParserExamen : IServicioParserExamen
         Opcion,
         Continuacion,
         Encabezado,
-        MarcaRespuesta
+        MarcaRespuesta,
+        Retroalimentacion
     }
 
     private sealed class LineaClasificada
@@ -483,10 +742,7 @@ public sealed class ServicioParserExamen : IServicioParserExamen
         public string? Letra { get; init; }
     }
 
-    /// <summary>
-    /// Clasifica cada línea de la página como enunciado, opción o continuación de la anterior.
-    /// </summary>
-    private static List<LineaClasificada> ClasificarLineas(List<Linea> lineas)
+    private static List<LineaClasificada> ClasificarLineas(List<Linea> lineas, EstadoClasificacion estado)
     {
         var resultado = new List<LineaClasificada>();
 
@@ -496,28 +752,83 @@ public sealed class ServicioParserExamen : IServicioParserExamen
         var xPregunta = lineas.Min(l => l.Izquierda);
         var xOpcion = DetectarColumnaDeOpciones(lineas, xPregunta);
 
-        // Saltos verticales: distinguen "continuación de una opción" de "pregunta nueva".
         var saltos = new List<double>();
         for (var i = 1; i < lineas.Count; i++)
-            saltos.Add(lineas[i - 1].Base - lineas[i].Base);
+        {
+            var diff = lineas[i - 1].Base - lineas[i].Base;
+            if (diff > 1) saltos.Add(diff);
+        }
 
         var saltoMedio = saltos.Count > 0 ? saltos.Order().ToList()[saltos.Count / 2] : 12;
-        var umbralContinuacion = saltoMedio * 1.6;
+        var umbralContinuacion = saltoMedio * 1.75;
+        var primeraPregunta = lineas.FindIndex(l =>
+            l.Numero is { Success: true } || EsEtiquetaEstadoExamen(l.Texto));
+        var titulosCentrados = new HashSet<int>();
 
-        var anterior = (Linea?)null;
-        var anteriorEraOpcion = false;
-        var anteriorTerminaba = false;
-        var opcionesEnBloque = 0;
-
-        foreach (var linea in lineas)
+        if (primeraPregunta > 0)
         {
-            if (linea.Texto.Length == 0)
+            var izquierdaPagina = lineas.Min(l => l.Izquierda);
+            var derechaPagina = lineas.Max(l => l.Derecha);
+            var anchoContenido = derechaPagina - izquierdaPagina;
+            var centroPagina = (izquierdaPagina + derechaPagina) / 2;
+
+            if (anchoContenido > 0)
+            {
+                for (var indice = 0; indice < primeraPregunta; indice++)
+                {
+                    var linea = lineas[indice];
+                    var centroLinea = (linea.Izquierda + linea.Derecha) / 2;
+                    var anchoLinea = linea.Derecha - linea.Izquierda;
+
+                    if (Math.Abs(centroLinea - centroPagina) <= anchoContenido * 0.08
+                        && anchoLinea <= anchoContenido * 0.8)
+                    {
+                        titulosCentrados.Add(indice);
+                    }
+                }
+            }
+        }
+
+        var anterior = estado.Anterior;
+        var anteriorEraOpcion = estado.AnteriorEraOpcion;
+        var anteriorTerminaba = estado.AnteriorTerminaba;
+        var opcionesEnBloque = estado.OpcionesEnBloque;
+
+        for (var indice = 0; indice < lineas.Count; indice++)
+        {
+            var linea = lineas[indice];
+
+            if (string.IsNullOrWhiteSpace(linea.Texto)
+                || linea.Texto.All(char.IsPunctuation))
                 continue;
 
+            if (titulosCentrados.Contains(indice))
+                continue;
+
+            if (EsEtiquetaEstadoExamen(linea.Texto))
+            {
+                resultado.Add(new LineaClasificada { Linea = linea, Tipo = TipoLinea.Encabezado });
+                continue;
+            }
+
+            var primeraDePagina = indice == 0 && anterior is not null;
             var salto = anterior is null ? 0 : anterior.Base - linea.Base;
 
-            // 0b) Línea con la marca "Respuesta correcta" en el margen derecho: no es una
-            //     opción, es la etiqueta que identifica la respuesta correcta.
+            var continuacionPermitida = primeraDePagina
+                ? EmpiezaEnMinuscula(linea.Texto)
+                : salto <= umbralContinuacion;
+
+            // 0a) Retroalimentación explícita de Campus Virtual ("La respuesta correcta es: ...")
+            if (PatronRetroalimentacionRespuesta.IsMatch(linea.Texto))
+            {
+                resultado.Add(new LineaClasificada { Linea = linea, Tipo = TipoLinea.Retroalimentacion });
+                anterior = linea;
+                anteriorEraOpcion = false;
+                anteriorTerminaba = true;
+                continue;
+            }
+
+            // 0b) Marca "Respuesta correcta" en el margen derecho
             if (linea.Etiqueta is not { Success: true } && PatronMarcaRespuesta.IsMatch(linea.Texto))
             {
                 resultado.Add(new LineaClasificada { Linea = linea, Tipo = TipoLinea.MarcaRespuesta });
@@ -527,9 +838,35 @@ public sealed class ServicioParserExamen : IServicioParserExamen
                 continue;
             }
 
-            // 0) Un encabezado de bloque ("Pregunta 1") no es una pregunta: se ignora,
-            //    pero no corta la pregunta anterior ni abre una nueva.
-            if (PatronEncabezado.IsMatch(linea.Texto))
+            // 0c) Encabezados, estados y puntuaciones
+            if (PatronEncabezado.IsMatch(linea.Texto) || PatronEstado.IsMatch(linea.Texto) || PatronPuntuacion.IsMatch(linea.Texto))
+            {
+                resultado.Add(new LineaClasificada { Linea = linea, Tipo = TipoLinea.Encabezado });
+                continue;
+            }
+
+            // 1) Etiqueta explícita ("a)", "b."):
+            //    Validamos secuencia para que una cita legal en el enunciado ("según el art. c) de la ley")
+            //    no se tome como la primera opción si aún no ha salido la 'a'.
+            if (linea.Etiqueta is { Success: true })
+            {
+                var letra = linea.Etiqueta.Groups["letra"].Value.ToLowerInvariant();
+                var esPrimeraValida = opcionesEnBloque == 0 && letra == "a";
+                var esSiguienteValida = opcionesEnBloque > 0;
+
+                if (esPrimeraValida || esSiguienteValida)
+                {
+                    resultado.Add(new LineaClasificada { Linea = linea, Tipo = TipoLinea.Opcion, Letra = letra });
+
+                    anterior = linea;
+                    anteriorEraOpcion = true;
+                    anteriorTerminaba = TerminaEnPuntuacion(linea.Texto);
+                    opcionesEnBloque++;
+                    continue;
+                }
+            }
+
+            if (EsLineaDeClaves(linea.Texto))
             {
                 resultado.Add(new LineaClasificada { Linea = linea, Tipo = TipoLinea.Encabezado });
                 anterior = linea;
@@ -538,91 +875,126 @@ public sealed class ServicioParserExamen : IServicioParserExamen
                 continue;
             }
 
-            // 1) Una etiqueta inequívoca ("a)", "b.") siempre es una opción nueva.
-            if (linea.Etiqueta is { Success: true })
+            // Pregunta numerada ("12. ...")
+            if (linea.Numero is { Success: true })
             {
-                var letra = linea.Etiqueta.Groups["letra"].Value.ToLowerInvariant();
-                resultado.Add(new LineaClasificada { Linea = linea, Tipo = TipoLinea.Opcion, Letra = letra });
-
+                resultado.Add(new LineaClasificada { Linea = linea, Tipo = TipoLinea.Enunciado });
                 anterior = linea;
-                anteriorEraOpcion = true;
+                anteriorEraOpcion = false;
                 anteriorTerminaba = TerminaEnPuntuacion(linea.Texto);
-                opcionesEnBloque++;
+                opcionesEnBloque = 0;
                 continue;
             }
 
-            // La continuación de una opción puede ir alineada con la viñeta, con la etiqueta o
-            // con el texto (sangrado colgante), así que se comprueba un RANGO, no una igualdad.
             var dentroDeRango = anterior is not null
                 && linea.Izquierda >= anterior.Izquierda - ToleranciaHorizontal
                 && linea.Izquierda <= Math.Max(anterior.XContenido, anterior.Izquierda + VentanaContinuacion);
 
-            // Si la línea anterior ya terminó en puntuación, su frase está completa:
-            // lo que viene detrás no puede ser su continuación.
-            //
-            // Las líneas con etiqueta ("a)") ya se han resuelto antes como opciones, así que
-            // aquí solo llegan líneas sin letra. Hay dos casos posibles:
-            //
-            //  a) Veníamos de una opción  -> es la continuación de esa opción (va sangrada).
-            //  b) Veníamos de un enunciado y la pregunta TODAVÍA NO tiene opciones
-            //     -> es la continuación del enunciado. Si ya tuviera opciones, sería
-            //        una opción nueva sin letra, y se decide por la sangría.
-            var esContinuacion = dentroDeRango
-                && !anteriorTerminaba
-                && salto <= umbralContinuacion
-                && (anteriorEraOpcion || opcionesEnBloque == 0);
+            // Una línea también continúa a la anterior si aún estamos en el enunciado (opcionesEnBloque == 0)
+            // y el salto vertical es normal, incluso si la primera frase del enunciado tenía un punto o dos puntos.
+            var esContinuacionDeEnunciado = !anteriorEraOpcion
+                && opcionesEnBloque == 0
+                && anterior is not null
+                && continuacionPermitida
+                && (dentroDeRango || !anteriorTerminaba || EmpiezaEnMinuscula(linea.Texto));
 
-            if (esContinuacion)
+            var esContinuacionDeOpcion = anteriorEraOpcion
+                && dentroDeRango
+                && continuacionPermitida
+                && (!anteriorTerminaba || EmpiezaEnMinuscula(linea.Texto));
+
+            if (esContinuacionDeEnunciado || esContinuacionDeOpcion)
             {
                 resultado.Add(new LineaClasificada { Linea = linea, Tipo = TipoLinea.Continuacion });
+                // CRÍTICO: Conservar anteriorEraOpcion si estábamos continuando una opción multilínea
+                anterior = linea;
+                anteriorTerminaba = TerminaEnPuntuacion(linea.Texto);
+                continue;
             }
-            else if (EsOpcionPorSangria(linea, xOpcion, xPregunta))
+
+            if (primeraDePagina || !EsOpcionPorSangria(linea, xOpcion, xPregunta))
             {
-                resultado.Add(new LineaClasificada { Linea = linea, Tipo = TipoLinea.Opcion, Letra = "" });
-                opcionesEnBloque++;
+                resultado.Add(new LineaClasificada { Linea = linea, Tipo = TipoLinea.Enunciado });
+                anteriorEraOpcion = false;
+                opcionesEnBloque = 0;
             }
             else
             {
-                resultado.Add(new LineaClasificada { Linea = linea, Tipo = TipoLinea.Enunciado });
-                opcionesEnBloque = 0;
+                resultado.Add(new LineaClasificada { Linea = linea, Tipo = TipoLinea.Opcion, Letra = "" });
+                anteriorEraOpcion = true;
+                opcionesEnBloque++;
             }
 
             anterior = linea;
-            anteriorEraOpcion = false;
             anteriorTerminaba = TerminaEnPuntuacion(linea.Texto);
+        }
+
+        estado.Anterior = anterior;
+        estado.AnteriorEraOpcion = anteriorEraOpcion;
+        estado.AnteriorTerminaba = anteriorTerminaba;
+        estado.OpcionesEnBloque = opcionesEnBloque;
+
+        foreach (var marca in resultado.Where(c => c.Tipo == TipoLinea.MarcaRespuesta))
+        {
+            var candidata = resultado
+                .Where(c => c.Tipo == TipoLinea.Opcion)
+                .OrderBy(c => Math.Abs(c.Linea.Base - marca.Linea.Base))
+                .FirstOrDefault();
+
+            if (candidata is not null && Math.Abs(candidata.Linea.Base - marca.Linea.Base) <= 10)
+                candidata.Linea.MarcaCorrecta = true;
         }
 
         return resultado;
     }
 
-    /// <summary>
-    /// True si la línea está sangrada respecto a la columna de las preguntas: eso significa
-    /// que es una opción aunque no lleve letra.
-    /// </summary>
     private static bool EsOpcionPorSangria(Linea linea, double xOpcion, double xPregunta)
         => linea.Izquierda >= xOpcion - ToleranciaHorizontal && linea.Izquierda > xPregunta + 2;
 
-    /// <summary>
-    /// True si el texto termina en puntuación: la frase está completa, así que lo que viene
-    /// detrás no es su continuación. La coma NO cuenta: una frase puede continuar tras coma.
-    /// </summary>
+    private static bool EsEtiquetaEstadoExamen(string texto)
+        => PatronEtiquetaEstadoExamen.IsMatch(texto);
+
     private static bool TerminaEnPuntuacion(string texto)
     {
         var recortado = texto.TrimEnd();
 
-        // "A. Correcta:" NO termina la frase: es una etiqueta y el texto de la opción
-        // viene en la línea siguiente.
         if (PatronVeredictoFinal.IsMatch(recortado))
             return false;
 
         return recortado.Length > 0
-            && (recortado[^1] is '.' or '?' or '!' or ':' or ';');
+            && (recortado[^1] is '.' or '?' or '!' or ';');
     }
 
-    /// <summary>
-    /// Deduce en qué columna X empiezan las opciones. Si hay opciones con letra, se usa su
-    /// posición; si no, se busca el siguiente nivel de sangría a la derecha.
-    /// </summary>
+    private static bool EmpiezaEnMinuscula(string texto)
+    {
+        foreach (var c in texto)
+        {
+            if (char.IsLetter(c))
+                return char.IsLower(c);
+
+            if (!char.IsWhiteSpace(c))
+                return false;
+        }
+
+        return false;
+    }
+
+    private static bool EsFragmentoDeOpcion(OpcionEnCurso opcion, OpcionEnCurso anterior)
+    {
+        var texto = opcion.Texto.Trim();
+
+        if (texto.Length == 0 || !char.IsLower(texto[0]))
+            return false;
+
+        if (texto.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length > 3)
+            return false;
+
+        if (anterior.Texto.Trim().Length < 10)
+            return false;
+
+        return !TerminaEnPuntuacion(anterior.Texto);
+    }
+
     private static double DetectarColumnaDeOpciones(List<Linea> lineas, double xPregunta)
     {
         var conEtiqueta = lineas
@@ -634,7 +1006,6 @@ public sealed class ServicioParserExamen : IServicioParserExamen
         if (conEtiqueta.Count > 0)
             return conEtiqueta[conEtiqueta.Count / 2];
 
-        // Sin etiquetas: el siguiente nivel de X distinto al de las preguntas.
         var niveles = lineas
             .Select(l => Math.Round(l.Izquierda))
             .Distinct()
@@ -650,11 +1021,8 @@ public sealed class ServicioParserExamen : IServicioParserExamen
         public required string Letra { get; set; }
         public required string Texto { get; set; }
         public bool Negrita { get; set; }
-
-        /// <summary>True si el PDF marca esta opción como la correcta.</summary>
+        public double Base { get; set; }
         public bool EsCorrecta { get; set; }
-
-        /// <summary>True si el PDF dice explícitamente que esta opción es incorrecta.</summary>
         public bool EsIncorrecta { get; set; }
     }
 
@@ -663,317 +1031,359 @@ public sealed class ServicioParserExamen : IServicioParserExamen
         public required string Enunciado { get; set; }
         public required List<OpcionEnCurso> Opciones { get; init; }
         public int Numero { get; set; } = -1;
+        public string? TextoRetroalimentacion { get; set; }
+    }
+
+    private sealed class EstadoClasificacion
+    {
+        public Linea? Anterior { get; set; }
+        public bool AnteriorEraOpcion { get; set; }
+        public bool AnteriorTerminaba { get; set; }
+        public int OpcionesEnBloque { get; set; }
+    }
+
+    private sealed class EstadoInterpretacion
+    {
+        public PreguntaEnCurso? Actual { get; set; }
     }
 
     private static void InterpretarLineas(
         List<Linea> lineas,
+        EstadoClasificacion clasificacion,
+        EstadoInterpretacion interpretacion,
         List<Pregunta> preguntas,
         Dictionary<string, int> numeros,
-        Dictionary<int, string> claves)
+        Dictionary<int, string> claves,
+        HashSet<string> fiables,
+        bool unirFragmentosOcr)
     {
         if (lineas.Count == 0)
             return;
 
-        PreguntaEnCurso? actual = null;
-
-        foreach (var clasificada in ClasificarLineas(lineas))
+        foreach (var clasificada in ClasificarLineas(lineas, clasificacion))
         {
             var linea = clasificada.Linea;
 
             RecogerClave(linea, claves);
 
-            // Los encabezados ("Pregunta 1") se ignoran: no abren ni cierran preguntas.
-            if (clasificada.Tipo == TipoLinea.Encabezado)
+            if (clasificada.Tipo == TipoLinea.Encabezado || clasificada.Tipo == TipoLinea.MarcaRespuesta)
                 continue;
+
+            if (clasificada.Tipo == TipoLinea.Retroalimentacion)
+            {
+                if (interpretacion.Actual is not null)
+                {
+                    var match = PatronRetroalimentacionRespuesta.Match(linea.Texto);
+                    if (match.Success)
+                        interpretacion.Actual.TextoRetroalimentacion = match.Groups["contenido"].Value.Trim();
+                }
+                continue;
+            }
 
             if (clasificada.Tipo == TipoLinea.Opcion)
             {
-                var indice = actual?.Opciones.Count ?? 0;
-                var opcion = ExtraerOpcion(linea, indice);
+                if (interpretacion.Actual is null)
+                    continue;
+
+                var indice = interpretacion.Actual.Opciones.Count;
+                var opcion = ExtraerOpcion(linea, indice, unirFragmentosOcr);
 
                 if (opcion.Letra.Length == 0)
                     continue;
 
-                // La marca puede venir en la misma línea de la opción.
-                if (linea.ContieneMarcaRespuesta)
+                if (linea.ContieneMarcaRespuesta || linea.MarcaCorrecta)
                     opcion.EsCorrecta = true;
 
-                actual?.Opciones.Add(opcion);
+                interpretacion.Actual.Opciones.Add(opcion);
                 continue;
             }
 
-            if (clasificada.Tipo == TipoLinea.MarcaRespuesta)
+            if (clasificada.Tipo == TipoLinea.Continuacion && interpretacion.Actual is not null)
             {
-                // La marca identifica la última opción añadida: esa es la correcta.
-                if (actual is not null && actual.Opciones.Count > 0)
-                    actual.Opciones[^1].EsCorrecta = true;
-
-                continue;
-            }
-
-            if (clasificada.Tipo == TipoLinea.Continuacion && actual is not null)
-            {
-                if (actual.Opciones.Count > 0)
+                if (interpretacion.Actual.Opciones.Count > 0)
                 {
-                    var ultima = actual.Opciones[^1];
-                    ultima.Texto = (ultima.Texto + " " + linea.Texto).Trim();
-                    ultima.Negrita |= linea.Negrita;
+                    var ultimaOpcion = interpretacion.Actual.Opciones[^1];
+                    var fragmento = ExtraerOpcion(linea, interpretacion.Actual.Opciones.Count - 1, unirFragmentosOcr);
+
+                    if (unirFragmentosOcr
+                        && fragmento.Letra.Length > 0
+                        && EsFragmentoDeOpcion(fragmento, ultimaOpcion))
+                    {
+                        ultimaOpcion.Texto = UnirTexto(ultimaOpcion.Texto, fragmento.Texto);
+                        ultimaOpcion.EsCorrecta |= fragmento.EsCorrecta;
+                    }
+                    else
+                    {
+                        ultimaOpcion.Texto = UnirTexto(ultimaOpcion.Texto, linea.Texto);
+                        ultimaOpcion.EsCorrecta |= linea.ContieneMarcaRespuesta || linea.MarcaCorrecta;
+                    }
                 }
                 else
                 {
-                    // Continuación del enunciado (que estaba partido en dos líneas).
-                    actual.Enunciado = (actual.Enunciado + " " + linea.Texto).Trim();
+                    interpretacion.Actual.Enunciado = UnirTexto(interpretacion.Actual.Enunciado, linea.Texto);
                 }
 
                 continue;
             }
 
-            // Pregunta nueva: se cierra la anterior.
-            if (actual is not null)
-                CerrarPregunta(actual, preguntas, numeros);
-
-            var numero = -1;
-            var enunciado = linea.Texto;
-
-            if (linea.Numero is { Success: true }
-                && int.TryParse(linea.Numero.Groups["numero"].Value, out var n))
+            if (clasificada.Tipo == TipoLinea.Enunciado)
             {
-                numero = n;
-                enunciado = linea.Numero.Groups["texto"].Value.Trim();
+                if (interpretacion.Actual is not null)
+                    CerrarPregunta(interpretacion.Actual, preguntas, numeros, fiables, unirFragmentosOcr);
+
+                var texto = linea.Numero is { Success: true }
+                    ? linea.Numero.Groups["texto"].Value.Trim()
+                    : linea.Texto.Trim();
+                var numero = 0;
+
+                if (linea.Numero is { Success: true })
+                {
+                    var numeroTexto = linea.Numero.Groups["numero"].Value;
+                    numero = numeroTexto is "I" or "l" or "i"
+                        ? 1
+                        : int.TryParse(numeroTexto, out var valor) ? valor : 0;
+                }
+                interpretacion.Actual = new PreguntaEnCurso
+                {
+                    Enunciado = texto,
+                    Opciones = [],
+                    Numero = numero
+                };
             }
-
-            // Algunos PDF dejan un punto suelto antes del enunciado.
-            enunciado = Regex.Replace(enunciado, @"^\.\s+", "").Trim();
-
-            actual = new PreguntaEnCurso
-            {
-                Enunciado = enunciado,
-                Opciones = [],
-                Numero = numero
-            };
         }
-
-        if (actual is not null)
-            CerrarPregunta(actual, preguntas, numeros);
     }
 
-    private static OpcionEnCurso ExtraerOpcion(Linea linea, int indice)
+    private static OpcionEnCurso ExtraerOpcion(Linea linea, int indice, bool unirFragmentosOcr)
     {
-        var letra = "";
-        var texto = linea.Texto;
-
-        if (linea.Etiqueta is { Success: true })
-        {
-            letra = linea.Etiqueta.Groups["letra"].Value.ToLowerInvariant();
-            texto = linea.Etiqueta.Groups["texto"].Value.Trim();
-        }
-
-        // Botón de radio: indica lo que eligió el alumno, no la respuesta correcta.
-        texto = PatronRadio.Replace(texto, "").Trim();
-
-        // "Respuesta correcta" va en el margen derecho de la misma línea.
-        texto = PatronMarcaRespuesta.Replace(texto, "").Trim();
-
-        // Limpieza de ruido típico del OCR: las marcas de veredicto que quedan
-        // sueltas en el texto ("correcta", "incorrecta", "respuesta") y los
-        // metadatos de cabecera (ENVIADO, fechas, identificadores hex largos).
-        texto = PatronRuidoOcr.Replace(texto, "").Trim();
-        texto = texto.TrimStart(':', ' ', '-');
-        texto = texto.TrimEnd(',', ';', ':', '.', ' ', '-');
-        texto = System.Text.RegularExpressions.Regex.Replace(texto, @"\s{2,}", " ");
-
+        var texto = linea.Texto.Trim();
+        var letra = indice < 5 ? ((char)('a' + indice)).ToString() : string.Empty;
         var esCorrecta = false;
         var esIncorrecta = false;
 
-        // Prefijo "Correcta:" / "Incorrecta:".
-        var veredicto = PatronPrefijoVeredicto.Match(texto);
-
-        if (veredicto.Success)
+        if (linea.Etiqueta is { Success: true } etiqueta)
         {
-            esCorrecta = veredicto.Groups["veredicto"].Value.Equals("Correcta", StringComparison.OrdinalIgnoreCase);
+            letra = etiqueta.Groups["letra"].Value.ToLowerInvariant();
+            texto = etiqueta.Groups["texto"].Value.Trim();
+            esCorrecta = etiqueta.Groups["asterisco"].Success;
+        }
+
+        var prefijo = PatronPrefijoVeredicto.Match(texto);
+        if (prefijo.Success)
+        {
+            esCorrecta = prefijo.Groups["veredicto"].Value.StartsWith("Correct", StringComparison.OrdinalIgnoreCase);
             esIncorrecta = !esCorrecta;
-            texto = texto[veredicto.Length..].Trim();
+            texto = texto[prefijo.Length..].Trim();
         }
 
-        if (letra.Length == 0)
+        texto = PatronRadio.Replace(texto, string.Empty);
+
+        var marcaFinal = PatronVeredictoFinal.Match(texto);
+        if (marcaFinal.Success)
         {
-            // Opción sin letra: se le asigna la siguiente por orden.
-            letra = ((char)('a' + Math.Min(indice, 4))).ToString();
+            esCorrecta = marcaFinal.Groups[1].Value.StartsWith("correct", StringComparison.OrdinalIgnoreCase);
+            esIncorrecta = !esCorrecta;
+            texto = texto[..marcaFinal.Index].Trim();
         }
+
+        if (PatronMarcaRespuesta.IsMatch(texto))
+        {
+            esCorrecta = true;
+            texto = PatronMarcaRespuesta.Replace(texto, string.Empty).Trim();
+        }
+
+        if (linea.Resaltada || linea.Negrita)
+            esCorrecta = true;
+
+        if (unirFragmentosOcr)
+            texto = PatronRuidoOcr.Replace(texto, string.Empty).Trim();
 
         return new OpcionEnCurso
         {
             Letra = letra,
             Texto = texto,
             Negrita = linea.Negrita,
+            Base = linea.Base,
             EsCorrecta = esCorrecta,
             EsIncorrecta = esIncorrecta
         };
     }
 
-    private static void CerrarPregunta(
-        PreguntaEnCurso enCurso,
-        List<Pregunta> preguntas,
-        Dictionary<string, int> numeros)
-    {
-        if (enCurso.Enunciado.Length < 8 || enCurso.Opciones.Count < 2)
-            return;
-
-        // La portada del PDF (nombre del archivo, título, autoría) no es una pregunta.
-        if (PatronArchivo.IsMatch(enCurso.Enunciado.Trim()))
-            return;
-
-        // Limpieza de opciones basura del OCR: texto vacío o metadatos.
-        var opcionesLimpias = enCurso.Opciones
-            .Where(o => !string.IsNullOrWhiteSpace(o.Texto) && o.Texto.Trim().Length >= 2)
-            .ToList();
-
-        // Limpieza del enunciado: quitar marcas de veredicto sueltas del OCR.
-        enCurso.Enunciado = PatronRuidoOcr.Replace(enCurso.Enunciado, "").Trim();
-        enCurso.Enunciado = System.Text.RegularExpressions.Regex.Replace(enCurso.Enunciado, @"\s{2,}", " ").Trim();
-
-        if (opcionesLimpias.Count < 2)
-            return;
-
-        enCurso.Opciones.Clear();
-        foreach (var o in opcionesLimpias)
-            enCurso.Opciones.Add(o);
-
-        var id = $"q-{preguntas.Count + 1}";
-
-        // La clave de respuesta, por orden de fiabilidad:
-        //  1. Marca explícita del PDF ("Correcta:" o "Respuesta correcta").
-        //  2. La única opción en negrita.
-        //  3. La primera opción.
-        var clave = enCurso.Opciones[0].Letra;
-
-        var marcadas = enCurso.Opciones.Where(o => o.EsCorrecta).ToList();
-
-        if (marcadas.Count == 1)
-        {
-            clave = marcadas[0].Letra;
-        }
-        else
-        {
-            var negritas = enCurso.Opciones.Where(o => o.Negrita).ToList();
-
-            if (negritas.Count == 1)
-                clave = negritas[0].Letra;
-        }
-
-        // Renumeración por posición: los PDFs/OCR a veces repiten letras ("a, b, b, e, e, d"),
-        // lo que provoca respuestas correctas duplicadas en el editor. Se asignan letras
-        // únicas por orden y se remapea la clave.
-        var letras = "abcdefghijklmnopqrstuvwxyz";
-        var mapeo = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-
-        for (var i = 0; i < enCurso.Opciones.Count; i++)
-        {
-            var nueva = i < letras.Length
-                ? letras[i].ToString()
-                : ((char)('a' + i)).ToString();
-
-            if (!mapeo.ContainsKey(enCurso.Opciones[i].Letra))
-                mapeo[enCurso.Opciones[i].Letra] = nueva;
-
-            enCurso.Opciones[i].Letra = nueva;
-        }
-
-        if (mapeo.TryGetValue(clave, out var nuevaClave))
-            clave = nuevaClave;
-        else if (enCurso.Opciones.Count > 0)
-            clave = enCurso.Opciones[0].Letra;
-
-        preguntas.Add(new Pregunta(
-            id,
-            enCurso.Enunciado,
-            enCurso.Opciones.Select(o => new Opcion(o.Letra, o.Texto)).ToList(),
-            clave));
-
-        if (enCurso.Numero > 0)
-            numeros[id] = enCurso.Numero;
-    }
-
-    /// <summary>
-    /// Extrae las claves de respuesta de una línea del tipo "1-b, 2-c" o "Respuestas: 1. b".
-    /// </summary>
     private static void RecogerClave(Linea linea, Dictionary<int, string> claves)
     {
-        if (linea.Texto.Length > 400)
+        if (!PatronPalabraClave.IsMatch(linea.Texto) && PatronClave.Matches(linea.Texto).Count < 2)
             return;
 
-        var esLineaDeClave = PatronPalabraClave.IsMatch(linea.Texto);
-        var esCorta = linea.Texto.Length <= 60;
-
-        if (!esLineaDeClave && !esCorta)
-            return;
-
-        foreach (Match coincidencia in PatronClave.Matches(linea.Texto))
+        foreach (Match match in PatronClave.Matches(linea.Texto))
         {
-            var numero = int.Parse(coincidencia.Groups["numero"].Value, CultureInfo.InvariantCulture);
-            var letra = coincidencia.Groups["letra"].Value.ToLowerInvariant();
-
-            claves[numero] = letra;
+            if (int.TryParse(match.Groups["numero"].Value, out var numero))
+                claves[numero] = match.Groups["letra"].Value.ToLowerInvariant();
         }
     }
 
-    /// <summary>
-    /// Aplica las claves de respuesta a las preguntas que tienen número en el examen.
-    /// </summary>
+    private static bool EsLineaDeClaves(string texto)
+    {
+        if (PatronClave.Matches(texto).Count >= 2)
+            return true;
+
+        var etiqueta = PatronPalabraClave.Match(texto);
+        if (!etiqueta.Success)
+            return false;
+
+        var resto = texto[etiqueta.Length..].Trim();
+        return resto.Length == 0
+            || resto.StartsWith(':')
+            || resto.StartsWith('-')
+            || PatronClave.IsMatch(resto);
+    }
+
     private static void AplicarClaves(
         List<Pregunta> preguntas,
         Dictionary<string, int> numeros,
-        Dictionary<int, string> claves)
+        Dictionary<int, string> claves,
+        HashSet<string> fiables)
     {
         for (var i = 0; i < preguntas.Count; i++)
         {
             var pregunta = preguntas[i];
 
-            if (!numeros.TryGetValue(pregunta.Id, out var numero))
+            if (!numeros.TryGetValue(pregunta.Id, out var numero)
+                || !claves.TryGetValue(numero, out var letra))
                 continue;
 
-            if (!claves.TryGetValue(numero, out var letra))
+            var opcion = pregunta.Opciones.FirstOrDefault(o =>
+                string.Equals(o.Id, letra, StringComparison.OrdinalIgnoreCase));
+            if (opcion is null)
                 continue;
 
-            // La clave solo se aplica si apunta a una opción que existe.
-            if (!pregunta.Opciones.Any(o => string.Equals(o.Id, letra, StringComparison.OrdinalIgnoreCase)))
-                continue;
-
-            preguntas[i] = pregunta with { ClaveRespuesta = letra };
+            preguntas[i] = pregunta with { ClaveRespuesta = opcion.Id };
+            fiables.Add(pregunta.Id);
         }
     }
 
-    /// <summary>
-    /// Volca la clasificación de una página: cada línea con su posición y el papel que se le
-    /// ha asignado. Sirve para entender por qué una pregunta se detecta o no.
-    /// </summary>
-    public List<(double Base, double Izquierda, double XContenido, string Texto, string Tipo, string? Letra, bool Negrita)>
-        DiagnosticarPagina(string rutaPdf, int numeroPagina)
+    private static void CerrarPregunta(
+        PreguntaEnCurso actual,
+        List<Pregunta> preguntas,
+        Dictionary<string, int> numeros,
+        HashSet<string> fiables,
+        bool unirFragmentosOcr)
     {
-        using var documento = PdfDocument.Open(rutaPdf);
-        var pagina = documento.GetPages().Skip(numeroPagina - 1).FirstOrDefault();
+        var enunciado = actual.Enunciado.Trim();
+        if (unirFragmentosOcr)
+        {
+            var numeroCabecera = PatronNumeroCabeceraCorregida.Match(enunciado);
+            if (numeroCabecera.Success)
+            {
+                var textoRestante = enunciado[numeroCabecera.Length..];
+                var teniaMetadatos = false;
 
-        if (pagina is null)
-            return [];
+                while (true)
+                {
+                    var metadato = PatronMetadatoCabeceraCorregida.Match(textoRestante);
+                    if (metadato.Success)
+                    {
+                        teniaMetadatos = true;
+                        textoRestante = textoRestante[metadato.Length..];
+                        continue;
+                    }
 
-        var lineas = ReconstruirLineas(pagina);
+                    var puntuacion = PatronPuntuacionCabeceraCorregida.Match(textoRestante);
+                    if (puntuacion.Success)
+                    {
+                        textoRestante = textoRestante[puntuacion.Length..];
+                        continue;
+                    }
 
-        var xPregunta = lineas.Count > 0 ? lineas.Min(l => l.Izquierda) : 0;
-        var xOpcion = lineas.Count > 0 ? DetectarColumnaDeOpciones(lineas, xPregunta) : 0;
+                    break;
+                }
 
-        Console.WriteLine($"Columna de preguntas X = {xPregunta:F1} | columna de opciones X = {xOpcion:F1}");
+                if (teniaMetadatos && textoRestante.Length > 0)
+                {
+                    if (actual.Numero <= 0
+                        && int.TryParse(numeroCabecera.Groups["numero"].Value, out var numeroDetectado))
+                    {
+                        actual.Numero = numeroDetectado;
+                    }
 
-        return ClasificarLineas(lineas)
-            .Select(c => (
-                c.Linea.Base,
-                c.Linea.Izquierda,
-                c.Linea.XContenido,
-                c.Linea.Texto,
-                c.Tipo.ToString(),
-                c.Letra,
-                c.Linea.Negrita))
+                    enunciado = textoRestante.Trim();
+                }
+            }
+        }
+
+        var opciones = actual.Opciones
+            .Where(o => !string.IsNullOrWhiteSpace(o.Texto))
+            .GroupBy(o => o.Letra, StringComparer.OrdinalIgnoreCase)
+            .Select(grupo => grupo.First())
             .ToList();
+
+        if (enunciado.Length == 0 || opciones.Count < 2 || PatronArchivo.IsMatch(enunciado))
+            return;
+
+        var retroalimentacion = actual.TextoRetroalimentacion;
+        if (!string.IsNullOrWhiteSpace(retroalimentacion))
+        {
+            var letra = Regex.Match(
+                retroalimentacion,
+                @"^\s*(?:(?:la\s+)?opci[oó]n\s+)?(?<letra>[a-e])(?:\b|[\)\].:\-])",
+                RegexOptions.IgnoreCase);
+
+            if (letra.Success)
+            {
+                var opcion = opciones.FirstOrDefault(o =>
+                    string.Equals(o.Letra, letra.Groups["letra"].Value, StringComparison.OrdinalIgnoreCase));
+                if (opcion is not null)
+                {
+                    foreach (var candidata in opciones)
+                        candidata.EsCorrecta = ReferenceEquals(candidata, opcion);
+                }
+            }
+            else
+            {
+                var normalizada = Normalizar(retroalimentacion);
+                var coincidencias = opciones.Where(o =>
+                    normalizada.Contains(Normalizar(o.Texto), StringComparison.Ordinal)
+                    || Normalizar(o.Texto).Contains(normalizada, StringComparison.Ordinal)).ToList();
+                if (coincidencias.Count == 1)
+                {
+                    foreach (var candidata in opciones)
+                        candidata.EsCorrecta = ReferenceEquals(candidata, coincidencias[0]);
+                }
+            }
+        }
+
+        var correctas = opciones.Where(o => o.EsCorrecta).ToList();
+        if (correctas.Count == 0)
+        {
+            var destacadas = opciones.Where(o => o.Negrita).ToList();
+            if (destacadas.Count == 1)
+                correctas = destacadas;
+        }
+
+        var correcta = correctas.Count == 1 ? correctas[0] : null;
+        var id = $"p-{Guid.NewGuid():N}"[..12];
+        var numero = actual.Numero > 0 ? actual.Numero : preguntas.Count + 1;
+        var opcionesModelo = opciones
+            .Select(o => new Opcion(o.Letra, o.Texto))
+            .ToList();
+        var clave = correcta?.Letra ?? opcionesModelo[0].Id;
+
+        preguntas.Add(new Pregunta(id, enunciado, opcionesModelo, clave));
+        numeros[id] = numero;
+        if (correcta is not null)
+            fiables.Add(id);
+    }
+
+    private static string UnirTexto(string texto, string continuacion)
+    {
+        var parte = continuacion.Trim();
+        return parte.Length == 0 ? texto : texto.TrimEnd() + " " + parte;
+    }
+
+    private static string Normalizar(string texto)
+    {
+        var descompuesto = texto.Normalize(NormalizationForm.FormD);
+        var caracteres = descompuesto
+            .Where(c => CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.NonSpacingMark)
+            .ToArray();
+        return Regex.Replace(new string(caracteres).ToLowerInvariant(), @"\s+", " ").Trim();
     }
 }
-
-

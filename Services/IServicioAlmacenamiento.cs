@@ -13,7 +13,7 @@ public interface IServicioAlmacenamiento
     /// <summary>Añade una carpeta o reemplaza la existente con el mismo Id.</summary>
     Task GuardarCarpetaAsync(Carpeta carpeta, CancellationToken ct = default);
 
-    /// <summary>Elimina una carpeta. Los tests que tenía pasan a quedar "sin carpeta".</summary>
+    /// <summary>Elimina una carpeta, sus tests y el progreso de sus preguntas.</summary>
     Task EliminarCarpetaAsync(string carpetaId, CancellationToken ct = default);
 
     /// <summary>Elimina un test.</summary>

@@ -12,57 +12,10 @@
         Background="{StaticResource BrushFondo}"
         WindowStartupLocation="CenterScreen">
 
-    <Grid ColumnDefinitions="264,*">
-
-        <!-- ==================== BARRA LATERAL ==================== -->
-        <Border Grid.Column="0"
-                Background="{StaticResource BrushSuperficie}"
-                BorderBrush="{StaticResource BrushBorde}"
-                BorderThickness="0,0,1,0">
-            <Grid RowDefinitions="Auto,Auto,Auto,*">
-
-                <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="24,22,24,0" Spacing="10">
-                    <Border Width="36" Height="36" CornerRadius="10"
-                            Background="{StaticResource BrushPrimario}" ClipToBounds="True">
-                        <Image Source="/Assets/repaso.ico" Stretch="UniformToFill" Width="36" Height="36" />
-                    </Border>
-                    <StackPanel Orientation="Horizontal" Spacing="1">
-                        <TextBlock Text="repaso" Classes="marca" />
-                        <TextBlock Text="." Classes="marcaParte" />
-                    </StackPanel>
-                </StackPanel>
-
-                <TextBlock Grid.Row="1" Text="MENÚ" Classes="etiqueta" Margin="24,28,24,0" />
-
-                <StackPanel Grid.Row="2" Margin="12,10,12,0" Spacing="4">
-                    <Button Classes="nav"
-                            Classes.activo="{Binding EsVistaInicio}"
-                            Command="{Binding IrAInicioCommand}">
-                        <StackPanel Orientation="Horizontal" Spacing="12">
-                            <PathIcon Data="M 2,9 L 10,2 L 18,9 L 16,9 L 16,17 L 11.5,17 L 11.5,12 L 8.5,12 L 8.5,17 L 4,17 L 4,9 Z" />
-                            <TextBlock Text="Inicio" VerticalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
-
-                    <Button Classes="nav" Command="{Binding IrAInicioCommand}">
-                        <Grid ColumnDefinitions="*,Auto">
-                            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="12">
-                                <PathIcon Data="M 2,5 L 8,5 L 10,7 L 18,7 L 18,16 L 2,16 Z" />
-                                <TextBlock Text="Mis carpetas" VerticalAlignment="Center" />
-                            </StackPanel>
-                            <Border Grid.Column="1" Background="{StaticResource BrushFondoTenue}" CornerRadius="8" Padding="7,1">
-                                <TextBlock Text="{Binding Carpetas.Count}" FontSize="11" FontWeight="SemiBold"
-                                           Foreground="{StaticResource BrushTextoSecundario}" />
-                            </Border>
-                        </Grid>
-                    </Button>
-                </StackPanel>
-
-            </Grid>
-        </Border>
+    <Grid>
 
         <!-- ==================== CONTENIDO ==================== -->
-        <Grid Grid.Column="1">
+        <Grid>
 
             <!-- Vista activa: el ViewLocator convierte el ViewModel en su control -->
             <ContentControl Content="{Binding VistaActual}" />
@@ -89,12 +42,12 @@
         </Grid>
 
         <!-- ==================== MODAL: INFORME DE IMPORTACIÓN ==================== -->
-        <Border Grid.ColumnSpan="2" Background="#66000000" IsVisible="{Binding MostrarInformeImportacion}">
+        <Border Background="#66000000" IsVisible="{Binding MostrarInformeImportacion}">
             <views:InformeImportacionView DataContext="{Binding InformeImportacion}" />
         </Border>
 
         <!-- ==================== MODAL GENÉRICO (renombrar / confirmar / crear) ==================== -->
-        <Border Grid.ColumnSpan="2" Background="#66000000" IsVisible="{Binding ModalVisible}">
+        <Border Background="#66000000" IsVisible="{Binding ModalVisible}">
             <Border Background="{StaticResource BrushSuperficie}"
                     BorderBrush="{StaticResource BrushBorde}" BorderThickness="1"
                     CornerRadius="20"

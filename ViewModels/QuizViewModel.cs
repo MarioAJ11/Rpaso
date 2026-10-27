@@ -9,21 +9,15 @@ namespace Rpaso.ViewModels;
 /// </summary>
 public sealed partial class QuizViewModel : ViewModelBase
 {
-    private readonly Action<string, bool> _registrarResultado;
-    private readonly Action? _alSalir;
-
-    /// <summary>
-    /// Orden de las opciones de cada pregunta, barajado una sola vez por sesión:
-    /// así, al volver a una pregunta ya vista, las opciones no cambian de sitio,
-    /// pero cada nueva práctica re-baraja todo.
-    /// </summary>
-    private readonly Dictionary<string, List<OpcionViewModel>> _ordenOpciones = new();
+    private readonly Func<string, bool, Task> _registrarResultado;
+    private readonly Func<Task>? _alSalir;
+    private readonly Dictionary<string, string> _respuestas = new(StringComparer.Ordinal);
 
     public QuizViewModel(
         string titulo,
         IReadOnlyList<PreguntaViewModel> preguntas,
-        Action<string, bool> registrarResultado,
-        Action? alSalir = null)
+        Func<string, bool, Task> registrarResultado,
+        Func<Task>? alSalir = null)
     {
         Titulo = titulo;
         Preguntas = preguntas;
@@ -40,22 +34,34 @@ public sealed partial class QuizViewModel : ViewModelBase
     /// <summary>Opciones de la pregunta actual, con su estado visual.</summary>
     public ObservableCollection<OpcionViewModel> Opciones { get; } = [];
 
+    public ObservableCollection<QuizPreguntaResultadoViewModel> Resultados { get; } = [];
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(PreguntaActual))]
     [NotifyPropertyChangedFor(nameof(NumeroPregunta))]
     [NotifyPropertyChangedFor(nameof(EsUltima))]
     [NotifyPropertyChangedFor(nameof(EsPrimera))]
+    [NotifyPropertyChangedFor(nameof(PuedeIrAnterior))]
+    [NotifyPropertyChangedFor(nameof(PuedeIrSiguiente))]
     private int _indiceActual;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(PuedeComprobar))]
+    [NotifyPropertyChangedFor(nameof(EsPracticando))]
+    private bool _esFinalizado;
+
+    [ObservableProperty]
     private string? _respuestaSeleccionada;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(PuedeComprobar))]
     [NotifyPropertyChangedFor(nameof(RespuestaEsCorrecta))]
     [NotifyPropertyChangedFor(nameof(RespuestaEsIncorrecta))]
     private bool _corregido;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PuedeIrAnterior))]
+    [NotifyPropertyChangedFor(nameof(PuedeIrSiguiente))]
+    [NotifyPropertyChangedFor(nameof(PuedeSalir))]
+    private bool _guardandoResultado;
 
     [ObservableProperty]
     private int _aciertos;
@@ -72,15 +78,21 @@ public sealed partial class QuizViewModel : ViewModelBase
 
     public bool EsPrimera => IndiceActual == 0;
 
-    public bool PuedeComprobar => !Corregido && RespuestaSeleccionada is not null;
+    public bool EsPracticando => !EsFinalizado;
+
+    public bool PuedeIrAnterior => !GuardandoResultado && !EsPrimera;
+
+    public bool PuedeIrSiguiente => !GuardandoResultado && !EsUltima;
+
+    public bool PuedeSalir => !GuardandoResultado;
 
     public bool RespuestaEsCorrecta => Corregido && PreguntaActual.ClaveRespuesta == RespuestaSeleccionada;
 
     public bool RespuestaEsIncorrecta => Corregido && !RespuestaEsCorrecta;
 
-    public string ResultadoTexto => Respondidas == 0
+    public string ResultadoTexto => Respondidas == 0 && !EsFinalizado
         ? string.Empty
-        : $"{Aciertos} de {Preguntas.Count} correctas";
+        : $"{Aciertos} correctas · {Respondidas - Aciertos} incorrectas · {Preguntas.Count - Respondidas} sin responder";
 
     partial void OnIndiceActualChanged(int value) => CargarOpciones();
 
@@ -103,38 +115,52 @@ public sealed partial class QuizViewModel : ViewModelBase
         var pregunta = PreguntaActual;
         var clave = pregunta.ClaveRespuesta;
 
-        if (!_ordenOpciones.TryGetValue(pregunta.Id, out var orden))
-        {
-            // Barajeo de Fisher-Yates sobre una copia, para no tocar la pregunta original.
-            var copia = pregunta.Opciones.ToList();
-            for (var i = copia.Count - 1; i > 0; i--)
-            {
-                var j = Random.Shared.Next(i + 1);
-                (copia[i], copia[j]) = (copia[j], copia[i]);
-            }
-
-            orden = copia.Select(o => new OpcionViewModel(o, clave)).ToList();
-            _ordenOpciones[pregunta.Id] = orden;
-        }
-
-        foreach (var opcion in orden)
+        foreach (var opcion in pregunta.Opciones.Select(o => new OpcionViewModel(o, clave)))
             Opciones.Add(opcion);
 
-        RespuestaSeleccionada = null;
         Corregido = false;
+        if (_respuestas.TryGetValue(pregunta.Id, out var respuesta))
+        {
+            RespuestaSeleccionada = respuesta;
+            Corregido = true;
+        }
+        else
+        {
+            RespuestaSeleccionada = null;
+        }
     }
 
     [RelayCommand]
-    private void Seleccionar(string id)
+    private async Task SeleccionarAsync(string id)
     {
-        if (!Corregido)
+        if (!Corregido && !GuardandoResultado)
+        {
             RespuestaSeleccionada = id;
+            GuardandoResultado = true;
+            try
+            {
+                var acertada = PreguntaActual.ClaveRespuesta == id;
+                await _registrarResultado(PreguntaActual.Id, acertada);
+
+                _respuestas[PreguntaActual.Id] = id;
+                Corregido = true;
+                Respondidas++;
+                if (acertada)
+                    Aciertos++;
+
+                OnPropertyChanged(nameof(ResultadoTexto));
+            }
+            finally
+            {
+                GuardandoResultado = false;
+            }
+        }
     }
 
     [RelayCommand]
     private void Anterior()
     {
-        if (EsPrimera)
+        if (!PuedeIrAnterior)
             return;
 
         IndiceActual--;
@@ -143,29 +169,34 @@ public sealed partial class QuizViewModel : ViewModelBase
     [RelayCommand]
     private void Siguiente()
     {
-        if (EsUltima)
+        if (!PuedeIrSiguiente)
             return;
 
         IndiceActual++;
     }
 
     [RelayCommand]
-    private void Comprobar()
+    private void VerResultados()
     {
-        if (!PuedeComprobar)
+        if (!EsUltima || GuardandoResultado)
             return;
 
-        Corregido = true;
+        Resultados.Clear();
+        for (var i = 0; i < Preguntas.Count; i++)
+        {
+            var pregunta = Preguntas[i];
+            _respuestas.TryGetValue(pregunta.Id, out var respuesta);
+            Resultados.Add(new QuizPreguntaResultadoViewModel(i + 1, pregunta, respuesta));
+        }
 
-        var acertada = PreguntaActual.ClaveRespuesta == RespuestaSeleccionada;
-        Respondidas++;
-        if (acertada)
-            Aciertos++;
-
-        _registrarResultado(PreguntaActual.Id, acertada);
+        EsFinalizado = true;
         OnPropertyChanged(nameof(ResultadoTexto));
     }
 
     [RelayCommand]
-    private void Salir() => _alSalir?.Invoke();
+    private async Task SalirAsync()
+    {
+        if (PuedeSalir && _alSalir is not null)
+            await _alSalir();
+    }
 }

@@ -100,13 +100,37 @@ public sealed partial class FolderViewModel : ViewModelBase
 
     public IRelayCommand PracticarCarpetaFalladasCommand => _principal.PracticarCarpetaFalladasCommand;
 
-    public IRelayCommand AbrirEditorCommand => _principal.AbrirEditorCommand;
-
-    public IRelayCommand RenombrarTestCommand => _principal.RenombrarTestCommand;
-
-    public IRelayCommand EliminarTestCommand => _principal.EliminarTestCommand;
-
     public IRelayCommand ImportarPdfCommand => _principal.ImportarPdfCommand;
+
+    /// <summary>Abre el editor de preguntas del examen.</summary>
+    [RelayCommand]
+    private void EditarTest(TestViewModel? test)
+    {
+        if (test is null)
+            return;
+
+        _principal.AbrirEditorCommand.Execute(test);
+    }
+
+    /// <summary>Renombra el examen.</summary>
+    [RelayCommand]
+    private void RenombrarTest(TestViewModel? test)
+    {
+        if (test is null)
+            return;
+
+        _principal.RenombrarTestCommand.Execute(test);
+    }
+
+    /// <summary>Elimina el examen.</summary>
+    [RelayCommand]
+    private void EliminarTest(TestViewModel? test)
+    {
+        if (test is null)
+            return;
+
+        _principal.EliminarTestCommand.Execute(test);
+    }
 
     [RelayCommand]
     private void PracticarSeleccion()

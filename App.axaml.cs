@@ -92,10 +92,7 @@ public partial class App : Application
             viewModel.PracticarCarpetaCommand.Execute(carpeta);
 
             if (vista == "quiz-corregido" && viewModel.VistaActual is QuizViewModel quiz)
-            {
-                quiz.SeleccionarCommand.Execute("a");
-                quiz.ComprobarCommand.Execute(null);
-            }
+                await quiz.SeleccionarCommand.ExecuteAsync("a");
         }
     }
 

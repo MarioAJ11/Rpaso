@@ -13,7 +13,8 @@
 
   <ItemGroup>
     <Folder Include="Models\" />
-    <AvaloniaResource Include="Assets\**" />
+    <AvaloniaResource Include="Assets\Estilos\**" />
+    <AvaloniaResource Include="Assets\repaso.ico" />
   </ItemGroup>
 
   <!-- La tarea de telemetría de Avalonia (Avalonia.BuildServices) falla al cargarse en

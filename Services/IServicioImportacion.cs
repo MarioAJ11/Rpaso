@@ -77,7 +77,8 @@ public sealed class ServicioImportacion : IServicioImportacion
                 }
 
                 await _almacenamiento.GuardarTestAsync(analisis.Test, ct);
-                resultados.Add(ResultadoImportacion.Importado(ruta, analisis.Test.Preguntas.Count));
+                resultados.Add(ResultadoImportacion.Importado(
+                    ruta, analisis.Test.Preguntas.Count, analisis.Descartadas));
             }
             catch (OperationCanceledException)
             {

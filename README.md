@@ -1,370 +1,116 @@
 # Repaso
 
-Aplicación de escritorio para **convertir PDFs de exámenes tipo test en tests interactivos** y practicarlos.
+Aplicación de escritorio para organizar exámenes PDF y practicar sus preguntas tipo test.
 
-Todo funciona **en local y sin IA**: el análisis del PDF se hace con un **parser geométrico** que trabaja con
-las coordenadas del texto. No hay modelos, ni claves de API, ni conexión a internet, ni ficheros de más de 100 MB.
+Repaso convierte los documentos localmente, permite revisar y corregir las preguntas extraídas y
+guarda la biblioteca y el progreso en el propio equipo. No usa servicios externos ni funciones de IA.
 
-- **Frontend:** Avalonia UI 12 (XAML)
-- **Lógica:** C# · .NET 10 · MVVM con `CommunityToolkit.Mvvm`
-- **Extracción:** `PdfPig` (paquete NuGet `PdfPig`, namespace `UglyToad.PdfPig`)
+## Capturas
 
----
+### Biblioteca
 
-## Puesta en marcha
+![Pantalla principal de Repaso](Assets/imgApp.png)
+
+
+![Pantalla funciones](Assets/imgApp2.png)
+
+### Carpetas
+
+| Abrir una carpeta con clic izquierdo | Editar una carpeta con clic derecho |
+| --- | --- |
+| ![Abrir carpeta](Assets/imgEjCarpetaClickIzq.png) | ![Menú de carpeta](Assets/imgEjCarpetaClickDer.png) |
+
+### Práctica
+
+| Editar nombre test con doble clic en el nombre | Editar un test con clic derecho |
+| --- | --- |
+| ![Abrir carpeta](Assets/imgDobleClick.png) | ![Menú de carpeta](Assets/imgClickDer.png) |
+
+| Preguntas del examen | Repaso de preguntas falladas |
+| --- | --- |
+| ![Práctica de un test](Assets/imgTestPractica.png) | ![Preguntas erróneas](Assets/imgTestErroneas.png) |
+
+## Funciones
+
+- Importar uno o varios PDF y organizarlos en carpetas con colores.
+- Detectar preguntas y opciones a partir del texto y la disposición geométrica del PDF.
+- Procesar documentos escaneados con el OCR nativo de Windows cuando está disponible.
+- Practicar un examen, combinar varios exámenes o repasar preguntas falladas.
+- Editar el enunciado, las opciones y la respuesta correcta después de importar.
+- Guardar el progreso localmente, sin enviar los documentos a un servidor.
+
+La extracción es automática y puede requerir correcciones, especialmente en documentos escaneados o
+PDF con diseños poco habituales. Comprueba las preguntas y respuestas antes de utilizarlas para estudiar.
+
+## Probar la aplicación
+
+### Requisitos
+
+- Windows 10 (versión 2004 o posterior) o Windows 11.
+- [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) para compilar desde el código.
+- Para OCR: paquete de idioma español instalado en Windows.
+
+### Ejecutar desde el código
 
 ```powershell
-.\herramientas\compilar.ps1      # compila y firma (ver la nota de Windows 11)
+git clone https://github.com/MarioAJ11/Rpaso.git
+cd Rpaso
+dotnet restore
 dotnet run
 ```
 
-Sin más dependencias: no hay modelos que descargar ni que instalar.
+En la aplicación, crea o abre una carpeta y pulsa **Añadir otro PDF a esta carpeta**. Después,
+selecciona uno de los documentos de ejemplo:
 
-### ⚠️ Firmado de binarios en Windows 11 (obligatorio)
+- [Ejemplo original de práctica](<Assets/ejemplo-examen-practica.pdf>): preguntas de demostración
+  creadas para este proyecto.
+- [TEST PLATAFORMA 2](<Assets/TEST PLATAFORMA 2.pdf>): PDF de ejemplo autorizado por su propietario.
 
-Windows 11 distribuye la política de Code Integrity `VerifiedAndReputableDesktopFlightSupplemental`,
-que **exige que el ejecutable esté firmado** (o tenga reputación en la nube de Microsoft). Un binario
-recién compilado no la tiene, y Windows lo bloquea con:
-
-```
-Una directiva de Control de aplicaciones bloqueó este archivo. (0x800711C7)
-```
-
-Es lo que hace que la app funcione un día y al siguiente no: la política se refresca con Windows
-Update y el binario cambia de hash en cada compilación.
-
-`herramientas\firmar.ps1` crea un certificado autofirmado en el almacén del usuario (suficiente para
-desarrollo) y firma `Rpaso.exe` y `Rpaso.dll`.
-
-> **Para distribuir al público** hace falta un **certificado de firma de código comercial**: el
-> autofirmado solo vale en el equipo donde se creó. En un entorno corporativo debe emitirlo la CA
-> de la empresa.
-
-### Verificar el pipeline por consola
+Para compilar una versión Release:
 
 ```powershell
-# Resultado completo: preguntas, opciones y claves
-dotnet run -- --verificar "C:\ruta\a\tu\examen.pdf"
-
-# Importar varios y ver el informe de fallos
-dotnet run -- --importar "a.pdf" "b.pdf" "c.pdf"
-
-# Texto crudo que sale del PDF (para ver si tiene capa de texto)
-dotnet run -- --texto "C:\ruta\a\tu\examen.pdf"
-
-# Geometría: cada palabra con su X y su Y
-dotnet run -- --geometria "C:\ruta\a\tu\examen.pdf" 2
-
-# Cómo clasifica el parser cada línea (enunciado / opción / continuación / encabezado)
-dotnet run -- --analizar "C:\ruta\a\tu\examen.pdf" 2
+dotnet build -c Release
 ```
 
-> Si `--texto` dice "Páginas con texto: 0", el PDF es un **escaneo sin capa de texto**: la app lo
-> procesa igualmente con el OCR nativo de Windows (ver la sección de OCR).
-
-### Publicar (ejecutable autocontenido)
+Para publicar una versión autocontenida de 64 bits:
 
 ```powershell
-dotnet publish -c Release -r win-x64 --self-contained true -o publicacion
-powershell -ExecutionPolicy Bypass -File .\herramientas\firmar.ps1 -Ruta .\publicacion
+dotnet publish -c Release -r win-x64 --self-contained true
 ```
 
-El usuario final solo hace **doble clic** en `Rpaso.exe`: no necesita instalar .NET ni nada más.
-**Firmarlo es obligatorio** en equipos con Smart App Control (ver la nota de arriba).
+La publicación para distribución pública debe firmarse con un certificado de firma de código válido.
+No distribuyas certificados de desarrollo ni instales certificados autofirmados en equipos de terceros.
 
-### Instalador .exe (Inno Setup)
+## Privacidad y almacenamiento
 
-```powershell
-.\herramientas\instalar.ps1
+Los PDF se procesan en el equipo. La aplicación no los sube a la nube ni necesita claves o conexión a
+servicios de IA. La biblioteca y el progreso se guardan localmente en `%APPDATA%\Rpaso`.
+
+## Arquitectura
+
+- **Interfaz:** Avalonia UI y XAML.
+- **Aplicación:** C# con MVVM (`CommunityToolkit.Mvvm`).
+- **PDF:** PdfPig para extraer texto y posiciones.
+- **OCR:** `Windows.Data.Pdf` y `Windows.Media.Ocr`.
+- **Persistencia:** archivos JSON locales.
+
+```text
+Models/       Entidades y modelos de dominio
+Services/     PDF, OCR, importación y almacenamiento
+ViewModels/   Estado y lógica de presentación
+Views/        Ventanas y vistas Avalonia
+Assets/       Estilos, icono, ejemplos PDF y capturas
 ```
 
-Un solo comando que hace los cuatro pasos: **publicar → firmar → compilar el instalador → firmarlo**.
-Deja el instalador en `dist\Rpaso-1.0.0-setup.exe` (unos 55 MB).
+El proyecto apunta a Windows (`net10.0-windows10.0.19041.0`) debido a la integración con el OCR nativo.
 
-El instalador:
+## Limitaciones conocidas
 
-- instala la app en `C:\Program Files\Repaso`,
-- crea accesos directos en el **menú Inicio** y en el **Escritorio**,
-- permite **iniciar Repaso al encender el ordenador** (opcional),
-- al desinstalar, pregunta si quieres borrar tus exámenes y tu progreso (si no, se conservan).
+- El parser está orientado principalmente a documentos de una columna.
+- La calidad del OCR depende del escaneo y del paquete de idioma instalado.
+- Si un PDF no contiene una clave reconocible, la respuesta deberá revisarse en el editor.
 
-> **Requisito**: [Inno Setup 6](https://jrsoftware.org/isinfo.php) instalado. Si no lo tienes:
-> `winget install --id JRSoftware.InnoSetup -e`
+## Licencia
 
-#### El detalle que hace que la app arranque en un PC con Smart App Control
-
-Code Integrity valida las firmas contra los almacenes de la **máquina** (`LocalMachine\Root` y
-`LocalMachine\TrustedPublisher`). Un certificado autofirmado que solo esté en el almacén del
-**usuario** no vale: la app arranca, pero al cargar sus DLL se bloquea con `0x800711C7`.
-
-Por eso el instalador — que se ejecuta elevado por UAC — añade el certificado a los dos almacenes
-del equipo antes de lanzar la app. En un equipo ajeno esto instala una CA personal en ese equipo;
-para distribución al público hay que usar un certificado de firma de código comercial.
-
----
-
-## Cómo funciona el parser geométrico
-
-El problema: los PDFs de descarga (wuolah, campus virtuales) traen **publicidad, avisos legales, marcas de
-agua y portadas** mezclados con las preguntas. Un parser de texto plano se los come.
-
-La solución: **trabajar con las coordenadas**, no con la cadena de texto.
-
-```
-PDF
- │
- ├─ 1) Descartar los márgenes por coordenada Y
- │     La Y de PDF crece hacia arriba: el pie de página son las Y pequeñas.
- │     Se tira todo lo que esté por debajo del 5,5% inferior y por encima del 4,5% superior.
- │
- ├─ 2) Reconstruir las líneas agrupando por línea base
- │     Cada palabra tiene una Y base. Las palabras con la misma Y base son la misma línea.
- │     Se unen respetando los huecos horizontales (una columna a la izquierda y otra a la
- │     derecha NO son la misma frase).
- │
- ├─ 3) Clasificar cada línea
- │     • "a)", "b." …            → opción (etiqueta explícita)
- │     • sangrada respecto a X   → opción sin letra (los exams de Kansei no las traen)
- │     • termina en . ? ! :      → la frase está completa, lo siguiente es otra cosa
- │     • en la misma columna y con salto vertical pequeño → continuación de la anterior
- │     • resto                   → enunciado
- │
- └─ 4) Ensamblar preguntas y aplicar la clave de respuestas
-```
-
-### Las señales geométricas que se usan
-
-| Señal | Para qué |
-|---|---|
-| `BoundingBox.Bottom` | Línea base: agrupa palabras en la misma línea |
-| `BoundingBox.Top` / `Height` | Descartar márgenes y calcular tolerancias |
-| `BoundingBox.Left` | Detectar la sangría de las opciones y alinear continuaciones |
-| Salto vertical entre líneas | Distinguir "continuación" de "pregunta nueva" |
-| `Letter.FontDetails.IsBold` | Detectar la opción correcta (en estos tests va en negrita) |
-
-### Separación de palabras (importante)
-
-PdfPig decide por su cuenta cuándo dos letras son la misma palabra, y su tolerancia por defecto es
-tan amplia que en algunos PDF deja el texto **soldado**: `Enelprocesodepolimerizacion`.
-
-La solución es pasarle un extractor propio con la distancia máxima de unión reducida a 0,5 pt:
-
-```csharp
-pagina.GetWords(new NearestNeighbourWordExtractor(
-    new NearestNeighbourWordExtractor.NearestNeighbourWordExtractorOptions
-    {
-        MaximumDistance = (_, _) => 0.5
-    }))
-```
-
-### Reglas de continuación
-
-Una línea sin letra puede ser la continuación de la anterior o una opción nueva. Se decide así:
-
-| Situación | Regla |
-| --- | --- |
-| La anterior era una opción | Es su continuación (aunque esté más a la derecha) |
-| La anterior era un enunciado **y la pregunta aún no tiene opciones** | Es la continuación del enunciado |
-| La anterior era un enunciado y ya había opciones | Es una opción nueva sin letra |
-| La anterior terminaba en `.` `?` `!` `:` `;` | Es una frase completa: lo que sigue es otra cosa |
-
-Una coma **no** cuenta como fin de frase, y las etiquetas `Correcta:` / `Incorrecta:` tampoco.
-
-### Cómo se averigua la respuesta correcta
-
-Por orden de fiabilidad:
-
-1. **Marca explícita del PDF**:
-   - `Correcta:` delante del texto de la opción → esa es la buena.
-   - `Respuesta correcta` en el margen derecho → esa es la buena.
-   - `Incorrecta:` → esa es la mala (informativo, no se usa como clave).
-2. **Clave numérica** en el PDF (`Respuestas: 1-b, 2-c`).
-3. **Opción en negrita**: si hay exactamente una, esa es la correcta.
-4. Si no hay ninguna, se usa la primera opción.
-
-> La negrita se lee de `FontDetails.IsBold`, **no** del nombre de la fuente: el prefijo de
-> subconjunto (`DAAAAA+Times`) se asigna por orden de aparición y no dice nada.
->
-> No todos los exams marcan la respuesta en negrita. De los PDFs revisados, 3 sí lo hacen
-> (MEGATEST, TEST-TEORIA, Tests-Respuestas) y 4 no (Tema-2, los de Kansei, Test-1-parcial):
-> en esos la clave cae en la primera opción hasta que se corrija a mano.
-
-### Formatos de PDF soportados
-
-| Formato | Cómo se detecta |
-| --- | --- |
-| Opciones con letra (`a)`, `b.` …) | Etiqueta al inicio de la línea |
-| Opciones sin letra (una línea por opción) | Sangría en X respecto a la columna del enunciado |
-| `• A) texto` con viñeta | La viñeta se admite delante de la etiqueta |
-| Campus virtual (`Correcta:` / `Incorrecta:` + `Respuesta correcta` a la derecha) | Las marcas del propio PDF |
-| Opciones partidas en varias líneas | Se unen por rango de X y salto vertical |
-| Enunciado partido en dos líneas | Se unen salvo que la anterior termine en puntuación |
-| `Pregunta N` como encabezado | Se ignora: no es una pregunta |
-| Nota en el margen derecho | Se parte la línea en los huecos horizontales grandes |
-
-### Rendimiento real medido
-
-| PDF | Preguntas | Tiempo |
-| --- | --- | --- |
-| wuolah-free-Tests-Respuestas.pdf (66 pág.) | 388 | 1,8 s |
-| wuolah-free-RECOPILACION-TEST-PROCESOS.pdf | 287 | 1,9 s |
-| wuolah-free-MEGATEST-PROCESOS-1P.pdf | 190 | 1,4 s |
-| wuolah-free-TEST-PRIMER-PARCIAL-KANSEI.pdf | 173 | 1,4 s |
-| wuolah-free-Test-Parcial-1-Kansei.pdf (sin letras en las opciones) | 151 | 0,6 s |
-| wuolah-free-TEST-TEORIA.pdf | 50 | 1,3 s |
-| wuolah-free-Test-1-parcial.pdf | 22 | 1,1 s |
-| wuolah-free-Tema-2.pdf | 12 | 1,2 s |
-
----
-
-## OCR (PDF escaneados)
-
-Los PDF de móvil escaneados no tienen capa de texto. La app los lee con **OCR nativo de Windows**
-(`Windows.Data.Pdf` para renderizar + `Windows.Media.Ocr` para reconocer): **0 MB extra** de ejecutable.
-
-> Requiere el **paquete de idioma español** de Windows (Configuración → Hora e idioma → Idioma y región).
-> Sin él el OCR no está disponible y la app indica el motivo exacto.
-
-El OCR mete errores típicos (`l`/`I`, `rn`/`m`). Para eso está el **editor de preguntas**: el OCR te
-da el ~80% y el editor lo deja limpio.
-
----
-
-## Editor de preguntas
-
-Desde cualquier carpeta, botón **"Editar"** sobre un test:
-
-- Editar el **título** del examen.
-- Editar **enunciados** y **opciones**.
-- Marcar la **respuesta correcta** con el radio.
-- **Añadir / eliminar** opciones y preguntas.
-- Las letras (a, b, c…) se **renumeran** solas al añadir o quitar.
-
-Es imprescindible porque 4 de tus PDFs no marcan la respuesta: sin editor, la clave cae en la
-primera opción.
-
----
-
-## Gestión de la biblioteca
-
-Sobre cada **carpeta** de la pantalla de inicio hay dos botones: lápiz (renombrar) y aspa (eliminar).
-Sobre cada **examen**, dentro de la carpeta, hay tres: *Editar*, *Renombrar* y *Eliminar*.
-
-- **Renombrar** y **eliminar** usan un modal genérico con confirmación; el botón de eliminar se
-  pinta en rojo.
-- Al **eliminar una carpeta** sus exámenes **no se borran**: se quedan "sin carpeta".
-- Cada tarjeta de examen tiene una **casilla** para marcarlo. Con dos o más marcados, la barra
-  superior ofrece **"Practicar selección"**: una sola práctica con las preguntas de todos ellos
-  mezcladas (útil para repasar un mismo tema repartido en varios PDFs).
-- **"Seleccionar todo / ninguno"** marca o desmarca la carpeta entera de una vez.
-
-Las acciones se aplican al instante sobre la vista abierta: la tarjeta se actualiza sin
-recargar la aplicación.
-
----
-
-## Estructura del proyecto
-
-```
-Rpaso/
-├── Models/                     Modelo de dominio (records inmutables, sin UI)
-│   ├── Carpeta.cs              Carpeta temática
-│   ├── ColorCarpeta.cs         Paleta de colores
-│   ├── Opcion.cs
-│   ├── Pregunta.cs
-│   ├── ProgresoPregunta.cs     Progreso del usuario sobre cada pregunta
-│   └── Test.cs                 Examen importado
-├── Services/
-│   ├── IServicioAlmacenamiento.cs   Persistencia JSON
-│   ├── IServicioExtraccionPdf.cs   Lectura del PDF con PdfPig
-│   ├── IServicioImportacion.cs     Caso de uso: PDF → test guardado
-│   ├── IServicioParserExamen.cs    Contrato del parser geométrico
-│   ├── IServicioOcrWindows.cs      Contrato del OCR nativo de Windows
-│   ├── PalabraTexto.cs             Abstracción palabra + coordenadas (PDF u OCR)
-│   ├── ServicioAlmacenamiento.cs
-│   ├── ServicioExtraccionPdf.cs
-│   ├── ServicioOcrWindows.cs       ⭐ OCR con Windows.Media.Ocr
-│   └── ServicioParserExamen.cs     ⭐ el parser geométrico
-├── ViewModels/                 Presentación y estado (CommunityToolkit.Mvvm)
-├── Views/                      XAML
-│   ├── MainWindow.axaml        Shell: barra lateral + cabecera + contenido + modales
-│   ├── HomeView.axaml          Inicio: métricas y carpetas
-│   ├── FolderView.axaml        Carpetas: PDFs y acciones de práctica
-│   ├── EditorTestView.axaml    Editor de preguntas
-│   ├── InformeImportacionView.axaml  Informe de la importación (importados y fallos)
-│   └── QuizView.axaml          Modo examen
-├── Assets/Estilos/
-│   ├── Tema.axaml              Paleta (recursos)
-│   └── Estilos.axaml           Estilos de controles
-├── App.axaml                   Registro de recursos, estilos y ViewLocator
-├── ViewLocator.cs              ViewModel → View por convención de nombre
-├── ModoVerificacion.cs         Modos de consola (--verificar, --texto, --geometria, --analizar)
-└── Program.cs                  Punto de entrada
-```
-
-### Navegación
-
-`MainViewModel.VistaActual` es un `object?`. Se enlaza al `ContentControl` del `MainWindow` y el
-**`ViewLocator`** convierte el ViewModel en su vista por convención:
-
-```
-Rpaso.ViewModels.HomeViewModel  →  Rpaso.Views.HomeView
-```
-
-Por eso las vistas **deben** llamarse `XxxView` (no `XxxWindow`): el `ViewLocator` sustituye
-`"ViewModel"` por `"View"` en el nombre del tipo.
-
----
-
-## Notas técnicas (trampas encontradas)
-
-- **`PdfPig`, no `UglyToad.PdfPig`.** El paquete de NuGet cambió de ID; el *namespace* sigue siendo
-  `UglyToad.PdfPig`.
-- **`Regex.Match()` nunca devuelve `null`.** Devuelve un `Match` con `Success == false`. Comprobar
-  `match is not null` hace que **todo** case con el patrón. Hay que usar `match is { Success: true }`.
-- **La Y de PDF crece hacia arriba.** El orden de lectura de una página es de Y **mayor** a menor, y el
-  pie de página son las Y **pequeñas**.
-- **`TextBox.Watermark` está obsoleto** en Avalonia 12: usa `PlaceholderText`.
-- **Un `ResourceDictionary` no admite `<Style>`.** Los estilos van en un fichero con raíz `<Styles>` que se
-  incluye con `StyleInclude`; los recursos (pinceles) van en otro con raíz `<ResourceDictionary>`.
-- **`Application.Resources` necesita un `ResourceDictionary` intermedio** para poder usar
-  `ResourceDictionary.MergedDictionaries`.
-- **Windows Defender Application Control (WDAC)** de algunas empresas bloquea binarios gestionados sin
-  firmar. Si el ejecutable no arranca, mira el log `Microsoft-Windows-CodeIntegrity/Operational`.
-- **Un `Button` dentro de otro `Button` no funciona**: el clic lo captura el padre. Los botones de
-  acción de una tarjeta que es un botón van en una **capa superpuesta** (`Grid` con el botón de la
-  tarjeta y un `StackPanel` encima).
-- **El `ViewLocator` sustituye `"ViewModel"` por `"View"` en el nombre completo del tipo**, así que
-  `Rpaso.ViewModels.EditorTestViewModel` busca `Rpaso.Views.EditorTestView`. Si la vista se llama de
-  otra forma, se muestra el nombre de la clase en vez de la interfaz.
-- **Los controles del tema Fluent se cebillan con su propio color**: el `CheckBox` sale invisible y el
-  `RadioButton` marcado sale rojo (el acento del sistema). Por eso la casilla de selección es un
-  `ToggleButton` propio (`Classes="casilla"`) y la respuesta correcta un `Button` con un círculo
-  interior.
-- **En PowerShell las variables no distinguen mayúsculas**: un parámetro `[string[]]$Fichero` y un
-  bucle `foreach ($fichero in ...)` son **la misma variable**, y al asignarle un `FileInfo` la
-  conversión a `string[]` lo deja en `$null`.
-- **El filtro `-Filter "Rpaso.*"` de `Get-ChildItem` no casa con `Rpaso-1.0.0-setup.exe`**: el
-  patrón de FileSystem de Windows no funciona como se espera. Hay que filtrar con `-like`.
-
-### Depuración
-
-`RPASO_DEBUG_JSON=1` ya no aplica (no hay IA).
-
-`RPASO_TEST_VISTA=carpeta|quiz|quiz-corregido|informe|editor` arranca directamente en una vista
-concreta (solo depuración). `RPASO_TEST_PDFS=a.pdf;b.pdf` indica los archivos a importar en el
-modo `informe`.
-
----
-
-## Límites conocidos
-
-- **PDF a dos columnas**: el parser asume una sola columna de texto. En un PDF a dos columnas las líneas
-  se mezclarían.
-- **Claves de respuesta**: si el PDF no incluye la clave, se usa la primera opción. Si el examen es del
-  tipo *"señalale la respuesta incorrecta"*, la clave que trae el examen es la opción **incorrecta**, y así
-  se guarda.
-- **Exámenes sin numerar**: si no hay clave numerada, no se puede emparejar la clave con la pregunta.
-- **OCR**: los escaneos dependen del paquete de idioma español de Windows y arrastran errores típicos
-  de reconocimiento (`l`/`I`, `rn`/`m`); el editor de preguntas es la red de seguridad.
-- **Solo Windows**: el OCR de Windows obliga a compilar para `net10.0-windows10.0.19041.0`.
+Consulta [LICENSE.txt](LICENSE.txt) para las condiciones de uso y distribución del proyecto. Los
+documentos PDF de ejemplo tienen sus propios derechos y no alteran la licencia del código.

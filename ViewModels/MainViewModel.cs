@@ -270,7 +270,8 @@ public sealed partial class MainViewModel : ViewModelBase
     private void AbrirModal(
         string titulo, string descripcion, string valor,
         bool mostrarEntrada, bool peligroso, Func<Task> accion,
-        string textoBoton = "Aceptar", bool mostrarColores = false)
+        string textoBoton = "Aceptar", bool mostrarColores = false,
+        string descripcionCarpeta = "", string colorId = "violet")
     {
         ModalTitulo = titulo;
         ModalDescripcion = descripcion;
@@ -279,7 +280,8 @@ public sealed partial class MainViewModel : ViewModelBase
         ModalEsPeligroso = peligroso;
         ModalTextoBoton = textoBoton;
         ModalMostrarColores = mostrarColores;
-        ModalColorId = "violet";
+        ModalDescripcionCarpeta = descripcionCarpeta;
+        ModalColorId = colorId;
         _modalAccion = accion;
         ModalVisible = true;
     }
@@ -311,24 +313,50 @@ public sealed partial class MainViewModel : ViewModelBase
     // ─────────────── Carpetas ───────────────
 
     [RelayCommand]
-    private void RenombrarCarpeta(CarpetaViewModel? carpeta)
+    private void EditarCarpeta(CarpetaViewModel? carpeta)
     {
         if (carpeta is null)
             return;
 
         var original = carpeta.Carpeta;
 
-        AbrirModal("Renombrar carpeta", "Escribe el nuevo nombre.", carpeta.Nombre, true, false, async () =>
-        {
-            var nombre = ModalValor.Trim();
+        AbrirModal(
+            "Editar carpeta",
+            "Cambia el nombre, la descripción o el color.",
+            carpeta.Nombre,
+            true,
+            false,
+            async () =>
+            {
+                var nombre = ModalValor.Trim();
 
-            if (nombre.Length == 0 || nombre == original.Nombre)
-                return;
+                if (nombre.Length == 0)
+                    return;
 
-            await _almacenamiento.GuardarCarpetaAsync(original with { Nombre = nombre });
-            await CargarDatosAsync();
-            Estado = $"Carpeta renombrada a «{nombre}».";
-        });
+                var descripcion = ModalDescripcionCarpeta.Trim();
+                var colorId = ModalColorId;
+
+                if (nombre == original.Nombre
+                    && descripcion == original.Descripcion
+                    && colorId == original.ColorId)
+                {
+                    return;
+                }
+
+                await _almacenamiento.GuardarCarpetaAsync(original with
+                {
+                    Nombre = nombre,
+                    Descripcion = descripcion,
+                    ColorId = colorId
+                });
+
+                await CargarDatosAsync();
+                Estado = $"Carpeta «{nombre}» actualizada.";
+            },
+            textoBoton: "Guardar",
+            mostrarColores: true,
+            descripcionCarpeta: original.Descripcion,
+            colorId: original.ColorId);
     }
 
     [RelayCommand]
@@ -341,7 +369,7 @@ public sealed partial class MainViewModel : ViewModelBase
 
         AbrirModal(
             "Eliminar carpeta",
-            $"Se eliminará «{carpeta.Nombre}». Los exámenes que tenía se quedarán sin carpeta (no se borran).",
+            $"Se eliminará la carpeta «{carpeta.Nombre}» junto con todos sus exámenes y el progreso asociado. No se puede deshacer.",
             string.Empty, false, true, async () =>
             {
                 await _almacenamiento.EliminarCarpetaAsync(id);
@@ -461,10 +489,18 @@ public sealed partial class MainViewModel : ViewModelBase
     private QuizViewModel CrearQuiz(string titulo, IReadOnlyList<PreguntaViewModel> preguntas)
     {
         var vistaAnterior = VistaActual;
-        return new QuizViewModel(titulo, preguntas, RegistrarResultado, () => VistaActual = vistaAnterior);
+        return new QuizViewModel(
+            titulo,
+            preguntas,
+            (preguntaId, acertada) => RegistrarResultadoAsync(preguntaId, acertada, vistaAnterior),
+            async () =>
+            {
+                VistaActual = vistaAnterior;
+                await CargarDatosAsync();
+            });
     }
 
-    private void RegistrarResultado(string preguntaId, bool acertada)
+    private async Task RegistrarResultadoAsync(string preguntaId, bool acertada, object? vistaAnterior)
     {
         var progreso = new ProgresoPregunta(
             preguntaId,
@@ -472,7 +508,13 @@ public sealed partial class MainViewModel : ViewModelBase
             acertada ? 0 : 1,
             DateTimeOffset.Now);
 
-        _ = _almacenamiento.GuardarProgresoAsync(progreso);
+        var idsSeleccionados = (vistaAnterior as FolderViewModel)?.IdsSeleccionados;
+
+        await _almacenamiento.GuardarProgresoAsync(progreso);
+        await CargarDatosAsync();
+
+        if (vistaAnterior is FolderViewModel carpetaAbierta)
+            carpetaAbierta.Refrescar(idsSeleccionados);
     }
 
     [RelayCommand]

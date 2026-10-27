@@ -1,12 +1,13 @@
 using Avalonia.Media;
+using CommunityToolkit.Mvvm.ComponentModel;
 using Rpaso.Models;
 
 namespace Rpaso.ViewModels;
 
 /// <summary>
-/// Presentación de una carpeta temática: color, número de tests y de preguntas falladas.
+/// Presentación de una carpeta temática: color, tests y progreso.
 /// </summary>
-public sealed class CarpetaViewModel : ViewModelBase
+public sealed partial class CarpetaViewModel : ViewModelBase
 {
     public CarpetaViewModel(Carpeta carpeta, IReadOnlyList<Test> tests, IReadOnlyDictionary<string, ProgresoPregunta> progreso)
         => Actualizar(carpeta, tests, progreso);

@@ -57,6 +57,21 @@ public sealed class ServicioAlmacenamiento : IServicioAlmacenamiento
 
     public async Task EliminarCarpetaAsync(string carpetaId, CancellationToken ct = default)
     {
+        var tests = (await CargarTestsAsync(ct)).ToList();
+        var testsEliminados = tests.Where(t => t.CarpetaId == carpetaId).ToList();
+        var idsPreguntas = testsEliminados
+            .SelectMany(t => t.Preguntas)
+            .Select(p => p.Id)
+            .ToHashSet(StringComparer.Ordinal);
+
+        tests.RemoveAll(t => t.CarpetaId == carpetaId);
+        await EscribirAsync(FicheroTests, tests, ct);
+
+        var progreso = (await CargarProgresoAsync(ct))
+            .Where(p => !idsPreguntas.Contains(p.PreguntaId))
+            .ToList();
+        await EscribirAsync(FicheroProgreso, progreso, ct);
+
         var carpetas = (await CargarCarpetasAsync(ct)).Where(c => c.Id != carpetaId).ToList();
         await EscribirAsync(FicheroCarpetas, carpetas, ct);
     }
