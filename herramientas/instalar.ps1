@@ -3,17 +3,18 @@
     Publica la aplicación, la firma y genera el instalador .exe (Inno Setup).
 
 .DESCRIPTION
-    Encadena los tres pasos que hacen falta para tener un instalador entregable:
+    Encadena los pasos que hacen falta para tener un instalador entregable:
 
         1) dotnet publish  ->  .\publicacion\   (app autocontenida, 236 MB)
-        2) firmar.ps1      ->  firma los binarios (Smart App Control lo exige)
+        2) firmar.ps1      ->  firma los binarios para el equipo de desarrollo
         3) ISCC            ->  .\dist\Rpaso-<version>-setup.exe
-        4) firmar.ps1      ->  firma el instalador (también lo evalúa Smart App Control)
+        4) firmar.ps1      ->  firma el instalador
 
-    El instalador se firma con el mismo certificado que la app. Con un
-    certificado autofirmado solo arranca en el equipo donde se creó; para
-    distribución al público hace falta un certificado de firma de código
-    comercial (ver README).
+    El instalador se firma con el mismo certificado que la app. Un certificado
+    autofirmado sirve para el equipo donde se creó, pero Smart App Control solo
+    acepta certificados emitidos por una CA pública: para entregar la app a otra
+    persona sin bloqueos hace falta un certificado de firma de código comercial
+    (ver README). El instalador NO instala el certificado de desarrollo.
 
 .PARAMETER SinPublicar
     No vuelve a publicar: reutiliza la carpeta .\publicacion que ya existe.
@@ -59,10 +60,9 @@ try {
 
     # --- 2) Firmar la app ------------------------------------------------------
     Write-Host "`n==> Firmando la aplicación..." -ForegroundColor Cyan
-    $cer = Join-Path $PSScriptRoot "certificado\Rpaso-Dev-Signing.cer"
 
     & powershell.exe -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "firmar.ps1") `
-        -Ruta ".\publicacion" -ExportarCertificado $cer
+        -Ruta ".\publicacion"
     if ($LASTEXITCODE -ne 0) { throw "El firmado de la aplicación falló." }
 
     # --- 3) Localizar el compilador de Inno Setup ------------------------------
@@ -105,10 +105,10 @@ try {
     Write-Host "`n==> Listo." -ForegroundColor Green
     Write-Host ("    Instalador : {0} ({1} MB)" -f $instalador.FullName, $mb) -ForegroundColor Green
     Write-Host ("    Firma      : {0}" -f $firma.Status) -ForegroundColor Green
-    Write-Host "`n    El instalador añade el certificado de firma a la confianza del equipo," -ForegroundColor DarkGray
-    Write-Host "    sin él Smart App Control bloquea la carga de las DLL (0x800711C7)." -ForegroundColor DarkGray
-    Write-Host "    En un equipo ajeno, esto instala una CA personal en el equipo: para" -ForegroundColor Yellow
-    Write-Host "    distribución al público, usa un certificado de firma de código comercial." -ForegroundColor Yellow
+    Write-Host "`n    El instalador no instala el certificado de desarrollo en el equipo destino." -ForegroundColor DarkGray
+    Write-Host "    Si Smart App Control está activado en otro equipo, Windows puede bloquear" -ForegroundColor Yellow
+    Write-Host "    la app: solo acepta certificados de una CA pública. Para una entrega sin" -ForegroundColor Yellow
+    Write-Host "    bloqueos, usa un certificado de firma de código comercial (ver README)." -ForegroundColor Yellow
 }
 finally {
     Pop-Location

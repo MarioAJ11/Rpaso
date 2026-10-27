@@ -81,6 +81,31 @@ dotnet publish -c Release -r win-x64 --self-contained true
 La publicación para distribución pública debe firmarse con un certificado de firma de código válido.
 No distribuyas certificados de desarrollo ni instales certificados autofirmados en equipos de terceros.
 
+## Distribución
+
+Para generar el instalador:
+
+```powershell
+.\herramientas\instalar.ps1
+```
+
+Genera `dist\Rpaso-1.0.0-setup.exe` (unos 55 MB). Ese es el único archivo que hay que entregar:
+se hace doble clic, se acepta el aviso de administrador y se instala. El instalador crea el acceso
+directo del escritorio y no borra los datos de `%APPDATA%\Rpaso` al desinstalar.
+
+El instalador está firmado con un certificado **autofirmado de desarrollo**. Por eso:
+
+- Windows SmartScreen puede mostrar "Windows protegió su PC". Hay que pulsar
+  **Más información → Ejecutar de todas formas**.
+- Si **Smart App Control** está activado, Windows puede bloquear la app (`0x800711C7`). Smart App
+  Control solo acepta certificados emitidos por una CA pública; instalar el certificado de
+  desarrollo no lo desbloquea. Se puede comprobar en **Seguridad de Windows → Control de
+  aplicaciones y navegador → Control de aplicaciones inteligente**.
+- Para una entrega sin bloqueos, firma la app y el instalador con un certificado de firma de
+  código de una CA pública (Certum, Sectigo, SSL.com, etc.) o publica una versión MSIX en
+  Microsoft Store. No distribuyas el certificado de desarrollo ni lo instales en equipos de
+  terceros.
+
 ## Privacidad y almacenamiento
 
 Los PDF se procesan en el equipo. La aplicación no los sube a la nube ni necesita claves o conexión a

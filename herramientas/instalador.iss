@@ -52,19 +52,11 @@ Name: "autostart"; Description: "Iniciar {#MiApp} al encender el ordenador"; Gro
 [Files]
 ; Todo lo publicado (app autocontenida: 236 MB con el runtime de .NET dentro).
 Source: "..\publicacion\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
-; El certificado de firma, para añadirlo a la confianza del equipo.
-Source: "..\herramientas\certificado\Rpaso-Dev-Signing.cer"; DestDir: "{tmp}"; \
-  Flags: deleteafterinstall
 
 [Run]
-; Code Integrity (Smart App Control) valida la firma con los almacenes de la MÁQUINA.
-; Un certificado que solo está en el almacén del usuario no vale: la app arranca pero
-; al cargar sus DLL se bloquea con 0x800711C7. Por eso el instalador (que corre
-; elevado) lo añade a "Raíces de confianza" y "Editores de confianza" del equipo.
-Filename: "{sys}\certutil.exe"; Parameters: "-addstore -f Root ""{tmp}\Rpaso-Dev-Signing.cer"""; \
-  StatusMsg: "Configurando la confianza del certificado..."; Flags: runhidden waituntilterminated
-Filename: "{sys}\certutil.exe"; Parameters: "-addstore -f TrustedPublisher ""{tmp}\Rpaso-Dev-Signing.cer"""; \
-  StatusMsg: "Configurando la confianza del certificado..."; Flags: runhidden waituntilterminated
+; Nota: el certificado autofirmado de desarrollo NO se instala en el equipo destino.
+; Smart App Control solo acepta certificados emitidos por una CA pública; añadir una
+; CA privada al almacén del equipo no lo desbloquea y sí debilita la seguridad.
 Filename: "{app}\{#MiExe}"; Description: "Iniciar {#MiApp} ahora"; WorkingDir: "{app}"; \
   Flags: nowait postinstall skipifsilent
 
