@@ -25,6 +25,8 @@ public sealed partial class TestViewModel : ViewModelBase
 
     public string Titulo => Test.Titulo;
 
+    public bool Completado => Test.Completado;
+
     /// <summary>Fecha corta tipo "19 oct".</summary>
     public string Fecha => Test.FechaImportacion.ToString("d MMM", CultureInfo.CurrentCulture);
 

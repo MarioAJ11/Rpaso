@@ -11,10 +11,12 @@ namespace Rpaso.Models;
 /// <param name="FechaImportacion">Momento de la importación.</param>
 /// <param name="ArchivoOrigen">Nombre del PDF de origen, para poder reubicarlo o reimportarlo.</param>
 /// <param name="Preguntas">Preguntas del test. Puede estar vacío si el parseo no encontró ninguna.</param>
+/// <param name="Completado">Indica si el usuario terminó una práctica completa de este test.</param>
 public record Test(
     [property: JsonPropertyName("id")] string Id,
     [property: JsonPropertyName("titulo")] string Titulo,
     [property: JsonPropertyName("carpetaId")] string CarpetaId,
     [property: JsonPropertyName("fechaImportacion")] DateTimeOffset FechaImportacion,
     [property: JsonPropertyName("archivoOrigen")] string ArchivoOrigen,
-    [property: JsonPropertyName("preguntas")] IReadOnlyList<Pregunta> Preguntas);
+    [property: JsonPropertyName("preguntas")] IReadOnlyList<Pregunta> Preguntas,
+    [property: JsonPropertyName("completado")] bool Completado = false);

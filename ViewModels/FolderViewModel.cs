@@ -1,3 +1,4 @@
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
 namespace Rpaso.ViewModels;
@@ -8,6 +9,9 @@ namespace Rpaso.ViewModels;
 public sealed partial class FolderViewModel : ViewModelBase
 {
     private readonly MainViewModel _principal;
+
+    [ObservableProperty]
+    private bool _modoSeleccion;
 
     public FolderViewModel(MainViewModel principal, CarpetaViewModel carpeta)
     {
@@ -135,10 +139,29 @@ public sealed partial class FolderViewModel : ViewModelBase
     [RelayCommand]
     private void PracticarSeleccion()
     {
-        if (!HaySeleccion)
+        if (!ModoSeleccion || !HaySeleccion)
             return;
 
-        _principal.PracticarSeleccion(Seleccionados);
+        var seleccionados = Seleccionados;
+        CancelarSeleccion();
+        _principal.PracticarSeleccion(seleccionados);
+    }
+
+    [RelayCommand]
+    private void IniciarSeleccion()
+    {
+        foreach (var test in Tests)
+            test.Seleccionada = false;
+
+        ModoSeleccion = true;
+    }
+
+    [RelayCommand]
+    private void CancelarSeleccion()
+    {
+        ModoSeleccion = false;
+        foreach (var test in Tests)
+            test.Seleccionada = false;
     }
 
     [RelayCommand]

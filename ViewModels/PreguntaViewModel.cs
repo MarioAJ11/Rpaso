@@ -15,6 +15,13 @@ public sealed class PreguntaViewModel : ViewModelBase
         Acertada = progreso.TryGetValue(pregunta.Id, out var registro2) && registro2.Acertada;
     }
 
+    internal PreguntaViewModel(PreguntaViewModel original, Pregunta pregunta)
+    {
+        Pregunta = pregunta;
+        Fallada = original.Fallada;
+        Acertada = original.Acertada;
+    }
+
     public Pregunta Pregunta { get; }
 
     public string Id => Pregunta.Id;

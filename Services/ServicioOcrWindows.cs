@@ -33,30 +33,31 @@ public sealed class ServicioOcrWindows : IServicioOcr
     /// <summary>Ancho en píxeles (~300 DPI para A4). Evita que el OCR confunda 'l' con '1' o pierda puntos.</summary>
     private const int AnchoRender = 2400;
 
-    public bool Disponible { get; }
+    private readonly Lazy<(bool Disponible, string? Motivo)> _estado;
 
-    public string? MotivoIndisponible { get; }
+    public bool Disponible => _estado.Value.Disponible;
+
+    public string? MotivoIndisponible => _estado.Value.Motivo;
 
     public ServicioOcrWindows()
+        => _estado = new Lazy<(bool Disponible, string? Motivo)>(
+            ComprobarDisponibilidad,
+            LazyThreadSafetyMode.ExecutionAndPublication);
+
+    private static (bool Disponible, string? Motivo) ComprobarDisponibilidad()
     {
         try
         {
-            var motor = CrearMotorPreferente();
+            if (CrearMotorPreferente() is not null)
+                return (true, null);
 
-            if (motor is null)
-            {
-                MotivoIndisponible =
-                    "Windows no tiene ningún motor de OCR para español ni para los idiomas del sistema. "
-                    + "Instala el paquete de idioma Español en Configuración > Hora e idioma > Idioma y región.";
-            }
-            else
-            {
-                Disponible = true;
-            }
+            return (false,
+                "Windows no tiene ningún motor de OCR para español ni para los idiomas del sistema. "
+                + "Instala el paquete de idioma Español en Configuración > Hora e idioma > Idioma y región.");
         }
         catch (Exception ex)
         {
-            MotivoIndisponible = $"No se pudo inicializar el OCR: {ex.Message}";
+            return (false, $"No se pudo inicializar el OCR: {ex.Message}");
         }
     }
 

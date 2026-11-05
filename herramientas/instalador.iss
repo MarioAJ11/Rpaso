@@ -8,7 +8,7 @@
 ; ─────────────────────────────────────────────────────────────────────────────
 
 #define MiApp        "Repaso"
-#define MiVersion    "1.0.0"
+#define MiVersion    "1.0.1"
 #define MiExe        "Rpaso.exe"
 #define MiPublisher  "Repaso"
 

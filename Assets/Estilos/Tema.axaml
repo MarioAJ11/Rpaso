@@ -17,14 +17,14 @@
 
     <SolidColorBrush x:Key="BrushTexto" Color="#1E293B" />
     <SolidColorBrush x:Key="BrushTextoEditable" Color="#334155" />
-    <SolidColorBrush x:Key="BrushTextoSecundario" Color="#64748B" />
-    <SolidColorBrush x:Key="BrushTextoTerciario" Color="#94A3B8" />
+    <SolidColorBrush x:Key="BrushTextoSecundario" Color="#475569" />
+    <SolidColorBrush x:Key="BrushTextoTerciario" Color="#64748B" />
 
     <SolidColorBrush x:Key="BrushExito" Color="#059669" />
-    <SolidColorBrush x:Key="BrushExitoSuave" Color="#ECFDF5" />
+    <SolidColorBrush x:Key="BrushExitoSuave" Color="#D1FAE5" />
     <SolidColorBrush x:Key="BrushExitoBorde" Color="#A7F3D0" />
     <SolidColorBrush x:Key="BrushError" Color="#E11D48" />
-    <SolidColorBrush x:Key="BrushErrorSuave" Color="#FFF1F2" />
+    <SolidColorBrush x:Key="BrushErrorSuave" Color="#FFE4E6" />
     <SolidColorBrush x:Key="BrushErrorBorde" Color="#FECDD3" />
     <SolidColorBrush x:Key="BrushAviso" Color="#D97706" />
     <SolidColorBrush x:Key="BrushAvisoSuave" Color="#FFFBEB" />

@@ -8,13 +8,21 @@
     </Style>
 
     <Style Selector="TextBlock.titulo">
-        <Setter Property="FontSize" Value="30" />
-        <Setter Property="FontWeight" Value="ExtraBold" />
+        <Setter Property="FontSize" Value="32" />
+        <Setter Property="FontWeight" Value="Bold" />
     </Style>
 
     <Style Selector="TextBlock.subtitulo">
-        <Setter Property="FontSize" Value="22" />
+        <Setter Property="FontSize" Value="24" />
         <Setter Property="FontWeight" Value="Bold" />
+    </Style>
+
+    <Style Selector="TextBlock.enunciado">
+        <Setter Property="TextWrapping" Value="Wrap" />
+        <Setter Property="MaxWidth" Value="800" />
+        <Setter Property="FontSize" Value="19" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="LineHeight" Value="28" />
     </Style>
 
     <Style Selector="TextBlock.etiqueta">
@@ -60,6 +68,18 @@
         <Setter Property="BorderBrush" Value="{StaticResource BrushBorde}" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="CornerRadius" Value="16" />
+    </Style>
+
+    <Style Selector="Border.contenedorLayout">
+        <Setter Property="MaxWidth" Value="1800" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="Margin" Value="24,16" />
+    </Style>
+
+    <Style Selector="Border.contenedorLectura">
+        <Setter Property="MaxWidth" Value="900" />
+        <Setter Property="HorizontalAlignment" Value="Center" />
+        <Setter Property="Margin" Value="20" />
     </Style>
 
     <!-- ================= BOTONES ================= -->
@@ -173,6 +193,18 @@
         <Setter Property="Foreground" Value="{StaticResource BrushTexto}" />
     </Style>
 
+    <Style Selector="Button.cancelarSeleccion">
+        <Setter Property="Background" Value="{StaticResource BrushErrorSuave}" />
+        <Setter Property="BorderBrush" Value="{StaticResource BrushErrorBorde}" />
+        <Setter Property="Foreground" Value="{StaticResource BrushError}" />
+    </Style>
+
+    <Style Selector="Button.cancelarSeleccion:pointerover">
+        <Setter Property="Background" Value="{StaticResource BrushErrorBorde}" />
+        <Setter Property="BorderBrush" Value="{StaticResource BrushError}" />
+        <Setter Property="Foreground" Value="{StaticResource BrushError}" />
+    </Style>
+
     <!-- ================= NAVEGACION LATERAL ================= -->
     <Style Selector="Button.nav">
         <Setter Property="Background" Value="Transparent" />
@@ -247,11 +279,30 @@
         <Setter Property="HorizontalContentAlignment" Value="Stretch" />
         <Setter Property="VerticalContentAlignment" Value="Stretch" />
         <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Transitions">
+            <Transitions>
+                <BrushTransition Property="Background" Duration="0:0:0.2" />
+                <BrushTransition Property="BorderBrush" Duration="0:0:0.2" />
+            </Transitions>
+        </Setter>
+    </Style>
+
+    <Style Selector="Button.tarjeta /template/ ContentPresenter">
+        <Setter Property="BoxShadow" Value="0 1 4 0 #10000000" />
+        <Setter Property="Transitions">
+            <Transitions>
+                <BoxShadowsTransition Property="BoxShadow" Duration="0:0:0.2" />
+            </Transitions>
+        </Setter>
     </Style>
 
     <Style Selector="Button.tarjeta:pointerover">
         <Setter Property="Background" Value="{StaticResource BrushSuperficie}" />
         <Setter Property="BorderBrush" Value="{StaticResource BrushPrimarioBorde}" />
+    </Style>
+
+    <Style Selector="Button.tarjeta:pointerover /template/ ContentPresenter">
+        <Setter Property="BoxShadow" Value="0 4 12 0 #1A000000" />
     </Style>
 
     <!-- ================= TARJETA CLICABLE (opciones del quiz) ================= -->
@@ -263,10 +314,36 @@
         <Setter Property="Padding" Value="14" />
         <Setter Property="HorizontalContentAlignment" Value="Stretch" />
         <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Transitions">
+            <Transitions>
+                <BrushTransition Property="Background" Duration="0:0:0.2" />
+                <BrushTransition Property="BorderBrush" Duration="0:0:0.2" />
+            </Transitions>
+        </Setter>
+    </Style>
+
+    <Style Selector="Button.opcion /template/ ContentPresenter">
+        <Setter Property="BoxShadow" Value="0 1 4 0 #10000000" />
+        <Setter Property="Transitions">
+            <Transitions>
+                <BoxShadowsTransition Property="BoxShadow" Duration="0:0:0.2" />
+            </Transitions>
+        </Setter>
     </Style>
 
     <Style Selector="Button.opcion:pointerover">
-        <Setter Property="BorderBrush" Value="{StaticResource BrushTextoTerciario}" />
+        <Setter Property="Background" Value="{StaticResource BrushPrimarioSuave}" />
+        <Setter Property="BorderBrush" Value="{StaticResource BrushPrimarioBorde}" />
+    </Style>
+
+    <Style Selector="Button.opcion:pointerover /template/ ContentPresenter">
+        <Setter Property="BoxShadow" Value="0 4 12 0 #1A000000" />
+    </Style>
+
+    <Style Selector="Button.opcion:focus">
+        <Setter Property="Background" Value="{StaticResource BrushPrimarioSuave}" />
+        <Setter Property="BorderBrush" Value="{StaticResource BrushPrimario}" />
+        <Setter Property="BorderThickness" Value="2" />
     </Style>
 
     <Style Selector="Button.opcion.seleccionada">
@@ -359,17 +436,37 @@
 
     <!-- ================= ICONOS DE CARPETA ================= -->
     <Style Selector="Button.iconoCarpeta">
-        <Setter Property="Background" Value="Transparent" />
-        <Setter Property="BorderBrush" Value="Transparent" />
-        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Background" Value="{StaticResource BrushFondoTenue}" />
+        <Setter Property="BorderBrush" Value="{StaticResource BrushBorde}" />
+        <Setter Property="BorderThickness" Value="1" />
         <Setter Property="CornerRadius" Value="16" />
         <Setter Property="Padding" Value="10" />
         <Setter Property="HorizontalContentAlignment" Value="Center" />
         <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="Transitions">
+            <Transitions>
+                <BrushTransition Property="Background" Duration="0:0:0.2" />
+                <BrushTransition Property="BorderBrush" Duration="0:0:0.2" />
+            </Transitions>
+        </Setter>
+    </Style>
+
+    <Style Selector="Button.iconoCarpeta /template/ ContentPresenter">
+        <Setter Property="BoxShadow" Value="0 2 6 0 #12000000" />
+        <Setter Property="Transitions">
+            <Transitions>
+                <BoxShadowsTransition Property="BoxShadow" Duration="0:0:0.2" />
+            </Transitions>
+        </Setter>
     </Style>
 
     <Style Selector="Button.iconoCarpeta:pointerover">
-        <Setter Property="Background" Value="#EEF2F7" />
+        <Setter Property="Background" Value="{StaticResource BrushPrimarioSuave}" />
+        <Setter Property="BorderBrush" Value="{StaticResource BrushPrimarioBorde}" />
+    </Style>
+
+    <Style Selector="Button.iconoCarpeta:pointerover /template/ ContentPresenter">
+        <Setter Property="BoxShadow" Value="0 4 12 0 #1A000000" />
     </Style>
 
     <Style Selector="Button.iconoCarpeta:pressed">

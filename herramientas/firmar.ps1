@@ -31,7 +31,7 @@
 .EXAMPLE
     .\herramientas\firmar.ps1
     .\herramientas\firmar.ps1 -Ruta .\publicacion
-    .\herramientas\firmar.ps1 -Fichero .\dist\Rpaso-1.0.0-setup.exe
+    .\herramientas\firmar.ps1 -Fichero .\dist\Rpaso-1.0.1-setup.exe
 #>
 [CmdletBinding()]
 param(

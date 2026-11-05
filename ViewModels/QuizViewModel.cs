@@ -11,18 +11,21 @@ public sealed partial class QuizViewModel : ViewModelBase
 {
     private readonly Func<string, bool, Task> _registrarResultado;
     private readonly Func<Task>? _alSalir;
+    private readonly Func<Task>? _alCompletar;
     private readonly Dictionary<string, string> _respuestas = new(StringComparer.Ordinal);
 
     public QuizViewModel(
         string titulo,
         IReadOnlyList<PreguntaViewModel> preguntas,
         Func<string, bool, Task> registrarResultado,
-        Func<Task>? alSalir = null)
+        Func<Task>? alSalir = null,
+        Func<Task>? alCompletar = null)
     {
         Titulo = titulo;
         Preguntas = preguntas;
         _registrarResultado = registrarResultado;
         _alSalir = alSalir;
+        _alCompletar = alCompletar;
 
         CargarOpciones();
     }
@@ -41,6 +44,7 @@ public sealed partial class QuizViewModel : ViewModelBase
     [NotifyPropertyChangedFor(nameof(NumeroPregunta))]
     [NotifyPropertyChangedFor(nameof(EsUltima))]
     [NotifyPropertyChangedFor(nameof(EsPrimera))]
+    [NotifyPropertyChangedFor(nameof(TextoAccion))]
     [NotifyPropertyChangedFor(nameof(PuedeIrAnterior))]
     [NotifyPropertyChangedFor(nameof(PuedeIrSiguiente))]
     private int _indiceActual;
@@ -79,6 +83,8 @@ public sealed partial class QuizViewModel : ViewModelBase
     public bool EsPrimera => IndiceActual == 0;
 
     public bool EsPracticando => !EsFinalizado;
+
+    public string TextoAccion => EsUltima ? "Finalizar" : "Siguiente";
 
     public bool PuedeIrAnterior => !GuardandoResultado && !EsPrimera;
 
@@ -176,9 +182,21 @@ public sealed partial class QuizViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private void VerResultados()
+    private async Task ContinuarAsync()
     {
-        if (!EsUltima || GuardandoResultado)
+        if (GuardandoResultado || EsFinalizado)
+            return;
+
+        if (EsUltima)
+            await VerResultadosAsync();
+        else
+            Siguiente();
+    }
+
+    [RelayCommand]
+    private async Task VerResultadosAsync()
+    {
+        if (!EsUltima || GuardandoResultado || EsFinalizado)
             return;
 
         Resultados.Clear();
@@ -188,6 +206,9 @@ public sealed partial class QuizViewModel : ViewModelBase
             _respuestas.TryGetValue(pregunta.Id, out var respuesta);
             Resultados.Add(new QuizPreguntaResultadoViewModel(i + 1, pregunta, respuesta));
         }
+
+        if (_alCompletar is not null)
+            await _alCompletar();
 
         EsFinalizado = true;
         OnPropertyChanged(nameof(ResultadoTexto));

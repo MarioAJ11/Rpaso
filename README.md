@@ -36,6 +36,9 @@ guarda la biblioteca y el progreso en el propio equipo. No usa servicios externo
 - Detectar preguntas y opciones a partir del texto y la disposición geométrica del PDF.
 - Procesar documentos escaneados con el OCR nativo de Windows cuando está disponible.
 - Practicar un examen, combinar varios exámenes o repasar preguntas falladas.
+- Ver qué exámenes se han completado; el estado se guarda al finalizar una práctica individual.
+- Aleatorizar las preguntas y el contenido de las opciones en cada repaso de preguntas falladas,
+  manteniendo las letras en orden y la respuesta correcta asociada a su nueva letra.
 - Editar el enunciado, las opciones y la respuesta correcta después de importar.
 - Guardar el progreso localmente, sin enviar los documentos a un servidor.
 
@@ -89,7 +92,7 @@ Para generar el instalador:
 .\herramientas\instalar.ps1
 ```
 
-Genera `dist\Rpaso-1.0.0-setup.exe` (unos 55 MB). Ese es el único archivo que hay que entregar:
+Genera `dist\Rpaso-1.0.1-setup.exe` (unos 55 MB). Ese es el único archivo que hay que entregar:
 se hace doble clic, se acepta el aviso de administrador y se instala. El instalador crea el acceso
 directo del escritorio y no borra los datos de `%APPDATA%\Rpaso` al desinstalar.
 

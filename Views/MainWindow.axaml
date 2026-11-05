@@ -10,7 +10,8 @@
         Width="1320" Height="840"
         MinWidth="1060" MinHeight="680"
         Background="{StaticResource BrushFondo}"
-        WindowStartupLocation="CenterScreen">
+        WindowStartupLocation="CenterScreen"
+        WindowState="Maximized">
 
     <Grid>
 
@@ -18,7 +19,9 @@
         <Grid>
 
             <!-- Vista activa: el ViewLocator convierte el ViewModel en su control -->
-            <ContentControl Content="{Binding VistaActual}" />
+            <Border Classes="contenedorLayout">
+                <ContentControl Content="{Binding VistaActual}" />
+            </Border>
 
             <!-- Capa de carga -->
             <Border Background="#77FFFFFF" IsVisible="{Binding Ocupado}">

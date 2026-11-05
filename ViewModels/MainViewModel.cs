@@ -441,7 +441,10 @@ public sealed partial class MainViewModel : ViewModelBase
         if (test is null)
             return;
 
-        VistaActual = CrearQuiz(test.Titulo, test.Preguntas);
+        VistaActual = CrearQuiz(
+            test.Titulo,
+            test.Preguntas,
+            () => MarcarTestCompletadoAsync(test.Test));
     }
 
     [RelayCommand]
@@ -455,7 +458,7 @@ public sealed partial class MainViewModel : ViewModelBase
         if (falladas.Count == 0)
             return;
 
-        VistaActual = CrearQuiz($"Falladas: {test.Titulo}", falladas);
+        VistaActual = CrearQuiz($"Falladas: {test.Titulo}", AleatorizarPreguntasFalladas(falladas));
     }
 
     [RelayCommand]
@@ -483,10 +486,15 @@ public sealed partial class MainViewModel : ViewModelBase
         if (falladas.Count == 0)
             return;
 
-        VistaActual = CrearQuiz($"Repaso de falladas: {carpeta.Nombre}", falladas);
+        VistaActual = CrearQuiz(
+            $"Repaso de falladas: {carpeta.Nombre}",
+            AleatorizarPreguntasFalladas(falladas));
     }
 
-    private QuizViewModel CrearQuiz(string titulo, IReadOnlyList<PreguntaViewModel> preguntas)
+    private QuizViewModel CrearQuiz(
+        string titulo,
+        IReadOnlyList<PreguntaViewModel> preguntas,
+        Func<Task>? alCompletar = null)
     {
         var vistaAnterior = VistaActual;
         return new QuizViewModel(
@@ -497,7 +505,62 @@ public sealed partial class MainViewModel : ViewModelBase
             {
                 VistaActual = vistaAnterior;
                 await CargarDatosAsync();
-            });
+            },
+            alCompletar);
+    }
+
+    private async Task MarcarTestCompletadoAsync(Test test)
+    {
+        if (!test.Completado)
+            await _almacenamiento.GuardarTestAsync(test with { Completado = true });
+    }
+
+    private static IReadOnlyList<PreguntaViewModel> AleatorizarPreguntasFalladas(
+        IReadOnlyList<PreguntaViewModel> preguntas)
+    {
+        return Desordenar(preguntas)
+            .Select(pregunta =>
+            {
+                var opciones = Desordenar(pregunta.Pregunta.Opciones);
+                var indiceCorrecta = opciones.FindIndex(o => o.Id == pregunta.ClaveRespuesta);
+                var opcionesRenumeradas = opciones
+                    .Select((opcion, indice) => new Opcion(EtiquetaOpcion(indice), opcion.Texto))
+                    .ToList();
+                var claveRespuesta = opcionesRenumeradas[indiceCorrecta].Id;
+                var preguntaAleatoria = pregunta.Pregunta with
+                {
+                    Opciones = opcionesRenumeradas,
+                    ClaveRespuesta = claveRespuesta
+                };
+
+                return new PreguntaViewModel(pregunta, preguntaAleatoria);
+            })
+            .ToList();
+    }
+
+    private static List<T> Desordenar<T>(IEnumerable<T> elementos)
+    {
+        var lista = elementos.ToList();
+
+        for (var i = lista.Count - 1; i > 0; i--)
+        {
+            var indice = Random.Shared.Next(i + 1);
+            (lista[i], lista[indice]) = (lista[indice], lista[i]);
+        }
+
+        return lista;
+    }
+
+    private static string EtiquetaOpcion(int indice)
+    {
+        var etiqueta = string.Empty;
+        do
+        {
+            etiqueta = (char)('a' + indice % 26) + etiqueta;
+            indice = indice / 26 - 1;
+        } while (indice >= 0);
+
+        return etiqueta;
     }
 
     private async Task RegistrarResultadoAsync(string preguntaId, bool acertada, object? vistaAnterior)

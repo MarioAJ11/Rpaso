@@ -5,6 +5,7 @@
              x:Class="Rpaso.Views.QuizView"
              x:DataType="vm:QuizViewModel">
 
+    <Border Classes="contenedorLectura">
     <Grid>
     <ScrollViewer IsVisible="{Binding EsPracticando}">
         <StackPanel Margin="48,36,48,42" Spacing="28"
@@ -44,8 +45,7 @@
                     <StackPanel Spacing="10">
                         <TextBlock Text="{Binding NumeroPregunta, StringFormat='PREGUNTA #{0}'}" Classes="etiqueta"
                                    Foreground="{StaticResource BrushPrimario}" />
-                        <TextBlock Text="{Binding PreguntaActual.Enunciado}" FontSize="19" FontWeight="Bold"
-                                   TextWrapping="Wrap" LineHeight="28" />
+                        <TextBlock Text="{Binding PreguntaActual.Enunciado}" Classes="enunciado" />
                     </StackPanel>
 
                     <ItemsControl ItemsSource="{Binding Opciones}">
@@ -108,7 +108,7 @@
                     <!-- Navegación -->
                     <Border Height="1" Background="{StaticResource BrushBordeSuave}" />
 
-                    <Grid ColumnDefinitions="Auto,Auto,*">
+                    <Grid ColumnDefinitions="Auto,*">
                         <Button Grid.Column="0" Command="{Binding AnteriorCommand}" IsEnabled="{Binding PuedeIrAnterior}">
                             <StackPanel Orientation="Horizontal" Spacing="6">
                                 <PathIcon Data="M 13,3 L 6,10 L 13,17 Z" Width="13" Height="13" />
@@ -116,10 +116,13 @@
                             </StackPanel>
                         </Button>
 
-                        <Button Grid.Column="1" Grid.ColumnSpan="2" HorizontalAlignment="Right"
-                                Command="{Binding SiguienteCommand}" IsEnabled="{Binding PuedeIrSiguiente}">
+                        <Button Grid.Column="1" Classes="primario" HorizontalAlignment="Right"
+                                Padding="24,14"
+                                Command="{Binding ContinuarCommand}"
+                                IsEnabled="{Binding PuedeSalir}"
+                                IsVisible="{Binding EsPracticando}">
                             <StackPanel Orientation="Horizontal" Spacing="6">
-                                <TextBlock Text="Siguiente" VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding TextoAccion}" VerticalAlignment="Center" />
                                 <PathIcon Data="M 7,3 L 14,10 L 7,17 Z" Width="13" Height="13" />
                             </StackPanel>
                         </Button>
@@ -127,14 +130,6 @@
 
                 </StackPanel>
             </Border>
-
-            <!-- Finalizar -->
-            <Button Classes="primario" HorizontalAlignment="Right" Padding="24,14"
-                    Command="{Binding VerResultadosCommand}"
-                    IsEnabled="{Binding PuedeSalir}"
-                    IsVisible="{Binding EsUltima}">
-                Ver resultados
-            </Button>
 
         </StackPanel>
     </ScrollViewer>
@@ -231,4 +226,5 @@
         </StackPanel>
     </ScrollViewer>
     </Grid>
+    </Border>
 </UserControl>
