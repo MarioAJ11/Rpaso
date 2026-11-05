@@ -62,7 +62,6 @@ public sealed partial class FolderViewModel : ViewModelBase
 
         OnPropertyChanged(nameof(Carpeta));
         OnPropertyChanged(nameof(Nombre));
-        OnPropertyChanged(nameof(Descripcion));
         OnPropertyChanged(nameof(Tests));
         OnPropertyChanged(nameof(TotalFalladas));
         OnPropertyChanged(nameof(TotalPreguntas));
@@ -74,8 +73,6 @@ public sealed partial class FolderViewModel : ViewModelBase
     }
 
     public string Nombre => Carpeta.Nombre;
-
-    public string Descripcion => Carpeta.Descripcion;
 
     public IReadOnlyList<TestViewModel> Tests => Carpeta.Tests;
 

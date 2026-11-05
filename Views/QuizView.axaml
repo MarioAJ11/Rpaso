@@ -15,11 +15,13 @@
             <Border Classes="panel" Padding="24">
                 <Grid ColumnDefinitions="*,Auto">
                     <StackPanel Grid.Column="0" Spacing="5">
-                        <Button Classes="fantasma" Command="{Binding SalirCommand}" Padding="6,0" HorizontalAlignment="Left">
-                            <StackPanel Orientation="Horizontal" Spacing="5">
-                                <PathIcon Data="M 13,3 L 6,10 L 13,17 Z" Width="13" Height="13" />
-                                <TextBlock Text="Salir del examen" FontSize="12" VerticalAlignment="Center" />
-                            </StackPanel>
+                        <Button Classes="fantasma" Command="{Binding SalirCommand}"
+                                Width="16" Height="18" Padding="0"
+                                HorizontalContentAlignment="Left" HorizontalAlignment="Left"
+                                ToolTip.Tip="Salir del examen">
+                            <Path Data="M 15,7.5 L 0,7.5 M 6,1.5 L 0,7.5 L 6,13.5"
+                                  Stroke="{StaticResource BrushTextoSecundario}" StrokeThickness="1.5"
+                                  StrokeLineCap="Round" StrokeJoin="Round" Width="15" Height="15" />
                         </Button>
                         <TextBlock Text="{Binding Titulo}" FontWeight="Bold" FontSize="16" />
                         <TextBlock Text="{Binding ResultadoTexto}" Classes="micro"

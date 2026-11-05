@@ -25,7 +25,6 @@
                                                Foreground="{StaticResource BrushPrimario}" />
                                 </Border>
                             </StackPanel>
-                            <TextBlock Text="{Binding Descripcion}" Classes="tenue" />
                         </StackPanel>
                     </StackPanel>
 
@@ -58,21 +57,52 @@
 
             <!-- ==================== LISTA DE TESTS ==================== -->
             <StackPanel Spacing="18">
-                <Grid ColumnDefinitions="*,Auto">
-                    <StackPanel Grid.Column="0" Spacing="3">
-                        <TextBlock Text="Exámenes en esta carpeta" FontSize="17" FontWeight="Bold" />
-                        <TextBlock Classes="micro"
-                                   Text="Pulsa Practicar para empezar · clic derecho para editar o eliminar · doble clic en el nombre para renombrar" />
-                    </StackPanel>
-                    <Button Grid.Column="1" Classes="fantasma" Command="{Binding ImportarPdfCommand}" VerticalAlignment="Center">
-                        <StackPanel Orientation="Horizontal" Spacing="6">
-                            <PathIcon Data="M 9,2 L 11,2 L 11,9 L 18,9 L 18,11 L 11,11 L 11,18 L 9,18 L 9,11 L 2,11 L 2,9 L 9,9 Z"
-                                      Foreground="{StaticResource BrushPrimario}" Width="14" Height="14" />
-                            <TextBlock Text="Añadir otro PDF a esta carpeta" VerticalAlignment="Center"
-                                       Foreground="{StaticResource BrushPrimario}" FontWeight="SemiBold" FontSize="12" />
+                <Border Classes="panel" Padding="16">
+                    <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="10">
+                        <TextBlock Grid.Column="0" Text="Exámenes en esta carpeta"
+                                   FontSize="17" FontWeight="Bold" VerticalAlignment="Center" />
+
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12"
+                                    VerticalAlignment="Center" IsVisible="{Binding ModoSeleccion}">
+                            <Button Classes="fantasma" Padding="8,4" Command="{Binding SeleccionarTodoCommand}">
+                                <TextBlock Text="Seleccionar todo / ninguno" FontSize="12" VerticalAlignment="Center" />
+                            </Button>
+                            <TextBlock Text="{Binding TextoSeleccion}" Classes="micro" VerticalAlignment="Center" />
                         </StackPanel>
-                    </Button>
-                </Grid>
+
+                        <Grid Grid.Column="2" IsVisible="{Binding HayTests}">
+                            <Button Classes="primario" Command="{Binding IniciarSeleccionCommand}"
+                                    IsVisible="{Binding !ModoSeleccion}">
+                                <StackPanel Orientation="Horizontal" Spacing="7">
+                                    <PathIcon Data="M 10,2 L 18,10 L 10,18 L 2,10 Z"
+                                              Foreground="White" Width="14" Height="14" />
+                                    <TextBlock Text="Empezar selección" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+
+                            <StackPanel Orientation="Horizontal" Spacing="8"
+                                        IsVisible="{Binding ModoSeleccion}">
+                                <Button Classes="cancelarSeleccion" Command="{Binding CancelarSeleccionCommand}"
+                                        Content="Cancelar" />
+                                <Button Classes="primario" Command="{Binding PracticarSeleccionCommand}"
+                                        IsEnabled="{Binding HaySeleccion}">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <PathIcon Data="M 10,2 L 18,10 L 10,18 L 2,10 Z"
+                                                  Foreground="White" Width="14" Height="14" />
+                                        <TextBlock Text="Empezar práctica" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>
+                        </Grid>
+
+                        <Button Grid.Column="3" Classes="fantasma" Command="{Binding ImportarPdfCommand}"
+                                VerticalAlignment="Center" Width="38" Height="36" Padding="0"
+                                ToolTip.Tip="Añadir PDF a esta carpeta">
+                            <PathIcon Data="M 3,2 L 11,2 L 15,6 L 15,10 L 13,10 L 13,7 L 10,7 L 10,4 L 5,4 L 5,16 L 12,16 L 12,18 L 3,18 Z M 16,11 L 18,11 L 18,13 L 20,13 L 20,15 L 18,15 L 18,17 L 16,17 L 16,15 L 14,15 L 14,13 L 16,13 Z"
+                                      Foreground="{StaticResource BrushPrimario}" Width="20" Height="20" />
+                        </Button>
+                    </Grid>
+                </Border>
 
                 <!-- Estado vacío -->
                 <Border Classes="panel" Padding="48" IsVisible="{Binding !HayTests}">
@@ -85,52 +115,16 @@
                     </StackPanel>
                 </Border>
 
-                <!-- Selección para práctica combinada -->
-                <Border Classes="panel" Padding="18" IsVisible="{Binding Tests.Count}">
-                    <Grid ColumnDefinitions="*,Auto">
-                        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="12"
-                                    VerticalAlignment="Center" IsVisible="{Binding ModoSeleccion}">
-                            <Button Classes="fantasma" Padding="8,4" Command="{Binding SeleccionarTodoCommand}">
-                                <TextBlock Text="Seleccionar todo / ninguno" FontSize="12" VerticalAlignment="Center" />
-                            </Button>
-                            <TextBlock Text="{Binding TextoSeleccion}" Classes="micro" VerticalAlignment="Center" />
-                        </StackPanel>
-
-                        <Button Grid.Column="1" Classes="fantasma" Command="{Binding IniciarSeleccionCommand}"
-                                IsVisible="{Binding !ModoSeleccion}">
-                            <StackPanel Orientation="Horizontal" Spacing="7">
-                                <PathIcon Data="M 10,2 L 18,10 L 10,18 L 2,10 Z"
-                                          Foreground="{StaticResource BrushPrimario}" Width="14" Height="14" />
-                                <TextBlock Text="Empezar selección" VerticalAlignment="Center"
-                                           Foreground="{StaticResource BrushPrimario}" />
-                            </StackPanel>
-                        </Button>
-
-                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8"
-                                    IsVisible="{Binding ModoSeleccion}">
-                            <Button Classes="cancelarSeleccion" Command="{Binding CancelarSeleccionCommand}"
-                                    Content="Cancelar" />
-                            <Button Classes="primario" Command="{Binding PracticarSeleccionCommand}"
-                                    IsEnabled="{Binding HaySeleccion}">
-                                <StackPanel Orientation="Horizontal" Spacing="7">
-                                    <PathIcon Data="M 10,2 L 18,10 L 10,18 L 2,10 Z"
-                                              Foreground="White" Width="14" Height="14" />
-                                    <TextBlock Text="Empezar práctica" VerticalAlignment="Center" />
-                                </StackPanel>
-                            </Button>
-                        </StackPanel>
-                    </Grid>
-                </Border>
-
-                <ItemsControl ItemsSource="{Binding Tests}">
+                <ItemsControl x:Name="ListaTests" ItemsSource="{Binding Tests}"
+                              HorizontalAlignment="Stretch" SizeChanged="OnTestListSizeChanged">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
-                            <WrapPanel />
+                            <WrapPanel ItemSpacing="20" LineSpacing="20" />
                         </ItemsPanelTemplate>
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:TestViewModel">
-                            <Border Classes="panel" Width="450" Margin="0,0,20,20" Padding="22"
+                            <Border Classes="panel" HorizontalAlignment="Stretch" Padding="22"
                                     ContextRequested="OnTestContextRequested">
                                 <Grid>
                                     <StackPanel Spacing="12">
@@ -175,7 +169,16 @@
                                                 VerticalAlignment="Bottom"
                                                 Command="{Binding $parent[ItemsControl].((vm:FolderViewModel)DataContext).PracticarTestCommand}"
                                                 CommandParameter="{Binding}"
-                                                Content="Practicar" />
+                                                Width="42" Height="36" Padding="0"
+                                                HorizontalContentAlignment="Center"
+                                                VerticalContentAlignment="Center"
+                                                ToolTip.Tip="Practicar">
+                                            <Path Data="M 1,9 L 17,9 M 10,2 L 17,9 L 10,16"
+                                                  Stroke="White" StrokeThickness="1.8"
+                                                  StrokeLineCap="Round" StrokeJoin="Round"
+                                                  HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                  Width="18" Height="18" />
+                                        </Button>
                                     </Grid>
 
                                     </StackPanel>

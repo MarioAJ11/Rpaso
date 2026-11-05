@@ -1,6 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
+using Avalonia.VisualTree;
 using Rpaso.ViewModels;
 
 namespace Rpaso.Views;
@@ -10,6 +11,23 @@ public partial class FolderView : UserControl
     public FolderView()
     {
         InitializeComponent();
+    }
+
+    private void OnTestListSizeChanged(object? sender, SizeChangedEventArgs e)
+    {
+        var panel = ListaTests.GetVisualDescendants().OfType<WrapPanel>().FirstOrDefault();
+        if (panel is null || e.NewSize.Width <= 0)
+            return;
+
+        const double anchoMinimoTarjeta = 360;
+        const double espacio = 20;
+        var columnas = e.NewSize.Width >= anchoMinimoTarjeta * 3 + espacio * 2
+            ? 3
+            : e.NewSize.Width >= anchoMinimoTarjeta * 2 + espacio
+                ? 2
+                : 1;
+
+        panel.ItemWidth = (e.NewSize.Width - espacio * (columnas - 1)) / columnas;
     }
 
     private void OnTestTitleDoubleTapped(object? sender, TappedEventArgs e)

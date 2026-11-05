@@ -64,8 +64,6 @@
 
                     <StackPanel Spacing="7" IsVisible="{Binding ModalMostrarEntrada}">
                         <TextBox Text="{Binding ModalValor}" PlaceholderText="Escribe aquí" />
-                        <TextBox Text="{Binding ModalDescripcionCarpeta}" PlaceholderText="Descripción (opcional)"
-                                 IsVisible="{Binding ModalMostrarColores}" />
                     </StackPanel>
 
                     <StackPanel Spacing="9" IsVisible="{Binding ModalMostrarColores}">

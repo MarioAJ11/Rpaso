@@ -177,8 +177,22 @@
         <Setter Property="BorderBrush" Value="{StaticResource BrushErrorBorde}" />
     </Style>
 
+    <Style Selector="Button.peligro /template/ ContentPresenter">
+        <Setter Property="Background" Value="{StaticResource BrushErrorSuave}" />
+        <Setter Property="BorderBrush" Value="{StaticResource BrushErrorBorde}" />
+        <Setter Property="Foreground" Value="{StaticResource BrushError}" />
+    </Style>
+
     <Style Selector="Button.peligro:pointerover">
         <Setter Property="Background" Value="{StaticResource BrushErrorBorde}" />
+        <Setter Property="BorderBrush" Value="{StaticResource BrushError}" />
+        <Setter Property="Foreground" Value="{StaticResource BrushError}" />
+    </Style>
+
+    <Style Selector="Button.peligro:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="{StaticResource BrushErrorBorde}" />
+        <Setter Property="BorderBrush" Value="{StaticResource BrushError}" />
+        <Setter Property="Foreground" Value="{StaticResource BrushError}" />
     </Style>
 
     <Style Selector="Button.fantasma">
@@ -199,7 +213,19 @@
         <Setter Property="Foreground" Value="{StaticResource BrushError}" />
     </Style>
 
+    <Style Selector="Button.cancelarSeleccion /template/ ContentPresenter">
+        <Setter Property="Background" Value="{StaticResource BrushErrorSuave}" />
+        <Setter Property="BorderBrush" Value="{StaticResource BrushErrorBorde}" />
+        <Setter Property="Foreground" Value="{StaticResource BrushError}" />
+    </Style>
+
     <Style Selector="Button.cancelarSeleccion:pointerover">
+        <Setter Property="Background" Value="{StaticResource BrushErrorBorde}" />
+        <Setter Property="BorderBrush" Value="{StaticResource BrushError}" />
+        <Setter Property="Foreground" Value="{StaticResource BrushError}" />
+    </Style>
+
+    <Style Selector="Button.cancelarSeleccion:pointerover /template/ ContentPresenter">
         <Setter Property="Background" Value="{StaticResource BrushErrorBorde}" />
         <Setter Property="BorderBrush" Value="{StaticResource BrushError}" />
         <Setter Property="Foreground" Value="{StaticResource BrushError}" />

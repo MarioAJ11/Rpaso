@@ -245,7 +245,6 @@ public sealed partial class MainViewModel : ViewModelBase
     [ObservableProperty] private bool _modalMostrarColores;
     [ObservableProperty] private string _modalTextoBoton = "Aceptar";
     [ObservableProperty] private string _modalColorId = "violet";
-    [ObservableProperty] private string _modalDescripcionCarpeta = string.Empty;
 
     private Func<Task>? _modalAccion;
 
@@ -270,8 +269,7 @@ public sealed partial class MainViewModel : ViewModelBase
     private void AbrirModal(
         string titulo, string descripcion, string valor,
         bool mostrarEntrada, bool peligroso, Func<Task> accion,
-        string textoBoton = "Aceptar", bool mostrarColores = false,
-        string descripcionCarpeta = "", string colorId = "violet")
+        string textoBoton = "Aceptar", bool mostrarColores = false, string colorId = "violet")
     {
         ModalTitulo = titulo;
         ModalDescripcion = descripcion;
@@ -280,7 +278,6 @@ public sealed partial class MainViewModel : ViewModelBase
         ModalEsPeligroso = peligroso;
         ModalTextoBoton = textoBoton;
         ModalMostrarColores = mostrarColores;
-        ModalDescripcionCarpeta = descripcionCarpeta;
         ModalColorId = colorId;
         _modalAccion = accion;
         ModalVisible = true;
@@ -296,7 +293,6 @@ public sealed partial class MainViewModel : ViewModelBase
         var carpeta = new Carpeta(
             Id: $"c-{Guid.NewGuid():N}"[..10],
             Nombre: nombre,
-            Descripcion: ModalDescripcionCarpeta.Trim(),
             ColorId: ModalColorId);
 
         await _almacenamiento.GuardarCarpetaAsync(carpeta);
@@ -322,7 +318,7 @@ public sealed partial class MainViewModel : ViewModelBase
 
         AbrirModal(
             "Editar carpeta",
-            "Cambia el nombre, la descripción o el color.",
+            "Cambia el nombre o el color.",
             carpeta.Nombre,
             true,
             false,
@@ -333,11 +329,9 @@ public sealed partial class MainViewModel : ViewModelBase
                 if (nombre.Length == 0)
                     return;
 
-                var descripcion = ModalDescripcionCarpeta.Trim();
                 var colorId = ModalColorId;
 
                 if (nombre == original.Nombre
-                    && descripcion == original.Descripcion
                     && colorId == original.ColorId)
                 {
                     return;
@@ -346,7 +340,6 @@ public sealed partial class MainViewModel : ViewModelBase
                 await _almacenamiento.GuardarCarpetaAsync(original with
                 {
                     Nombre = nombre,
-                    Descripcion = descripcion,
                     ColorId = colorId
                 });
 
@@ -355,7 +348,6 @@ public sealed partial class MainViewModel : ViewModelBase
             },
             textoBoton: "Guardar",
             mostrarColores: true,
-            descripcionCarpeta: original.Descripcion,
             colorId: original.ColorId);
     }
 

@@ -18,10 +18,6 @@ public sealed partial class CarpetaViewModel : ViewModelBase
 
     public string Nombre => Carpeta.Nombre;
 
-    public string Descripcion => string.IsNullOrWhiteSpace(Carpeta.Descripcion)
-        ? "Sin descripción"
-        : Carpeta.Descripcion;
-
     public IBrush Fondo { get; private set; } = null!;
 
     public IBrush Borde { get; private set; } = null!;
@@ -62,7 +58,6 @@ public sealed partial class CarpetaViewModel : ViewModelBase
         OnPropertyChanged(nameof(Carpeta));
         OnPropertyChanged(nameof(Id));
         OnPropertyChanged(nameof(Nombre));
-        OnPropertyChanged(nameof(Descripcion));
         OnPropertyChanged(nameof(Fondo));
         OnPropertyChanged(nameof(Borde));
         OnPropertyChanged(nameof(Texto));
